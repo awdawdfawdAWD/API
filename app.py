@@ -7,6 +7,8 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
+API_KEY = "bels-magic-hands-2026"
+
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
 
 
@@ -212,6 +214,8 @@ def leaderboard():
 
 @app.route("/api/appointments", methods=["GET"])
 def get_appointments():
+    if request.headers.get("X-API-Key") != API_KEY and request.headers.get("Referer", "").find("squarespace") == -1:
+        return jsonify({"error": "Unauthorized"}), 401
     status = request.args.get("status")
     with get_db() as conn:
         if status:
