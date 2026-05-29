@@ -1,10 +1,10 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
 import os
 from datetime import datetime
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(__name__)
 CORS(app)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
@@ -63,7 +63,16 @@ def init_db():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return jsonify({
+        "api": "Bel's Magic Hands Therapy",
+        "message": "Use /api/appointments to book",
+        "endpoints": {
+            "POST /api/appointments": "Book an appointment",
+            "GET /api/appointments": "List appointments",
+            "PATCH /api/appointments/<id>": "Update status",
+            "GET /api/health": "Health check"
+        }
+    })
 
 
 # ---- PEOPLE ENDPOINTS ----
