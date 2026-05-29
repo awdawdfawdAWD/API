@@ -3,6 +3,7 @@ from flask_cors import CORS
 import sqlite3
 import os
 from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
@@ -61,7 +62,16 @@ def init_db():
     print("Database initialized.")
 
 
-# ---- WEBSITE ----
+def require_api_key(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.headers.get("X-API-Key") != API_KEY:
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ---- HOME ----
 
 @app.route("/")
 def home():
@@ -213,9 +223,8 @@ def leaderboard():
 # ---- APPOINTMENT ENDPOINTS ----
 
 @app.route("/api/appointments", methods=["GET"])
+@require_api_key
 def get_appointments():
-    if request.headers.get("X-API-Key") != API_KEY and request.headers.get("Referer", "").find("squarespace") == -1:
-        return jsonify({"error": "Unauthorized"}), 401
     status = request.args.get("status")
     with get_db() as conn:
         if status:
@@ -230,6 +239,7 @@ def get_appointments():
 
 
 @app.route("/api/appointments/<int:appt_id>", methods=["GET"])
+@require_api_key
 def get_appointment(appt_id):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM appointments WHERE id = ?", (appt_id,)).fetchone()
@@ -239,6 +249,7 @@ def get_appointment(appt_id):
 
 
 @app.route("/api/appointments", methods=["POST"])
+@require_api_key
 def create_appointment():
     data = request.get_json()
     required = ["name", "message_type", "date", "time"]
@@ -267,6 +278,7 @@ def create_appointment():
 
 
 @app.route("/api/appointments/<int:appt_id>", methods=["PATCH"])
+@require_api_key
 def update_appointment(appt_id):
     data = request.get_json()
     with get_db() as conn:
@@ -297,6 +309,7 @@ def update_appointment(appt_id):
 
 
 @app.route("/api/appointments/<int:appt_id>", methods=["DELETE"])
+@require_api_key
 def delete_appointment(appt_id):
     with get_db() as conn:
         existing = conn.execute("SELECT * FROM appointments WHERE id = ?", (appt_id,)).fetchone()
