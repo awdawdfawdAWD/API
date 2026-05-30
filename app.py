@@ -4,6 +4,9 @@ import sqlite3
 import os
 from datetime import datetime
 from functools import wraps
+import threading
+import time
+import urllib.request
 
 app = Flask(__name__)
 CORS(app)
@@ -326,6 +329,17 @@ def health():
 
 
 init_db()
+
+def _keep_alive():
+    url = "https://api-1ilr.onrender.com/api/health"
+    while True:
+        try:
+            urllib.request.urlopen(url, timeout=15)
+        except:
+            pass
+        time.sleep(600)
+
+threading.Thread(target=_keep_alive, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
