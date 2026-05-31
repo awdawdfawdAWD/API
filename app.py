@@ -7,6 +7,9 @@ from functools import wraps
 import threading
 import time
 import urllib.request
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 CORS(app)
@@ -14,6 +17,18 @@ CORS(app)
 API_KEY = "bels-magic-hands-2026"
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
+
+SERVICES = {
+    "Swedish Massage": {"duration": "60 min", "price": 100},
+    "Deep Tissue Restoration": {"duration": "90 min", "price": 140},
+    "Sports Recovery Session": {"duration": "75 min", "price": 135},
+    "Hot-stone Massage": {"duration": "60 min", "price": 150},
+}
+
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_USER = os.environ.get("SMTP_USER", "bels_massage@belsmagichandsmassage.com")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
 
 
 def get_db():
@@ -59,9 +74,14 @@ def init_db():
                 time TEXT NOT NULL,
                 notes TEXT,
                 status TEXT NOT NULL DEFAULT 'pending',
+                price REAL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
     print("Database initialized.")
 
 
@@ -74,20 +94,73 @@ def require_api_key(f):
     return decorated
 
 
+def send_confirmation_email(data):
+    if not SMTP_PASS or not data.get("email"):
+        return
+    try:
+        svc = SERVICES.get(data.get("message_type", ""), {})
+        price = svc.get("price", 0)
+        duration = svc.get("duration", "")
+
+        html = f"""
+        <div style="font-family:Segoe UI,Arial,sans-serif;max-width:500px;margin:0 auto;background:#faf6f4;padding:32px;border-radius:12px;">
+            <div style="text-align:center;margin-bottom:24px;">
+                <h1 style="color:#d4838f;margin:0;font-size:22px;">Bel's Magic Hands Massage</h1>
+                <p style="color:#888;margin:4px 0 0;font-size:12px;">Appointment Confirmation</p>
+            </div>
+            <p style="color:#322834;font-size:14px;">Hi <strong>{data['name']}</strong>,</p>
+            <p style="color:#555;font-size:13px;">Your appointment has been booked. Here are the details:</p>
+            <div style="background:white;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #eee;">
+                <table style="width:100%;font-size:13px;color:#322834;">
+                    <tr><td style="padding:6px 0;color:#888;">Service</td><td style="padding:6px 0;text-align:right;"><strong>{data.get('message_type','')}</strong></td></tr>
+                    <tr><td style="padding:6px 0;color:#888;">Duration</td><td style="padding:6px 0;text-align:right;">{duration}</td></tr>
+                    <tr><td style="padding:6px 0;color:#888;">Date</td><td style="padding:6px 0;text-align:right;">{data.get('date','')}</td></tr>
+                    <tr><td style="padding:6px 0;color:#888;">Time</td><td style="padding:6px 0;text-align:right;">{data.get('time','')}</td></tr>
+                    <tr><td style="padding:6px 0;color:#888;border-top:1px solid #eee;">Price</td><td style="padding:6px 0;text-align:right;border-top:1px solid #eee;"><strong style="color:#d4838f;">${price:.0f}</strong></td></tr>
+                </table>
+            </div>
+            <p style="color:#888;font-size:11px;text-align:center;margin-top:24px;">Thank you for choosing Bel's Magic Hands!</p>
+        </div>
+        """
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Appointment Confirmed \u2014 Bel's Magic Hands"
+        msg["From"] = f"Bel's Magic Hands <{SMTP_USER}>"
+        msg["To"] = data["email"]
+        msg.attach(MIMEText(html, "html"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, data["email"], msg.as_string())
+        print(f"Confirmation email sent to {data['email']}")
+    except Exception as e:
+        print(f"Email send failed: {e}")
+
+
 # ---- HOME ----
 
 @app.route("/")
 def home():
     return jsonify({
         "api": "Bel's Magic Hands Therapy",
+        "services": SERVICES,
         "message": "Use /api/appointments to book",
         "endpoints": {
             "POST /api/appointments": "Book an appointment",
             "GET /api/appointments": "List appointments",
             "PATCH /api/appointments/<id>": "Update status",
+            "GET /api/services": "List services with prices",
             "GET /api/health": "Health check"
         }
     })
+
+
+# ---- SERVICES ----
+
+@app.route("/api/services", methods=["GET"])
+def get_services():
+    return jsonify(SERVICES)
 
 
 # ---- PEOPLE ENDPOINTS ----
@@ -260,10 +333,13 @@ def create_appointment():
     if missing:
         return jsonify({"error": f"Missing: {', '.join(missing)}"}), 400
 
+    svc = SERVICES.get(data.get("message_type", ""), {})
+    price = svc.get("price", 0)
+
     with get_db() as conn:
         cur = conn.execute(
-            """INSERT INTO appointments (name, email, phone, message_type, date, time, notes)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO appointments (name, email, phone, message_type, date, time, notes, price)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data["name"],
                 data.get("email"),
@@ -272,10 +348,14 @@ def create_appointment():
                 data["date"],
                 data["time"],
                 data.get("notes"),
+                price,
             ),
         )
         conn.commit()
         row = conn.execute("SELECT * FROM appointments WHERE id = ?", (cur.lastrowid,)).fetchone()
+
+    data_with_price = dict(row)
+    threading.Thread(target=send_confirmation_email, args=(data_with_price,), daemon=True).start()
 
     return jsonify(dict(row)), 201
 
