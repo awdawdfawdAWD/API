@@ -95,7 +95,11 @@ def require_api_key(f):
 
 
 def send_confirmation_email(data):
-    if not SMTP_PASS or not data.get("email"):
+    if not data.get("email"):
+        print("Email skipped: no customer email provided")
+        return
+    if not SMTP_PASS:
+        print("Email skipped: SMTP_PASS env var not set in Render")
         return
     try:
         svc = SERVICES.get(data.get("message_type", ""), {})
@@ -406,6 +410,28 @@ def delete_appointment(appt_id):
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/test-email", methods=["POST"])
+@require_api_key
+def test_email():
+    data = request.get_json()
+    if not data or not data.get("email"):
+        return jsonify({"error": "Provide an email in the body: {\"email\": \"you@email.com\"}"}), 400
+    if not SMTP_PASS:
+        return jsonify({"error": "SMTP_PASS env var is not set in Render. Go to Environment tab and add it."}), 500
+    try:
+        test_data = {
+            "email": data["email"],
+            "name": data.get("name", "Test User"),
+            "message_type": "Swedish Massage",
+            "date": "2026-06-15",
+            "time": "10:00",
+        }
+        send_confirmation_email(test_data)
+        return jsonify({"status": "Test email sent!", "to": data["email"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 init_db()
