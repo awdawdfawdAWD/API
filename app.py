@@ -97,10 +97,10 @@ def require_api_key(f):
 def send_confirmation_email(data):
     if not data.get("email"):
         print("Email skipped: no customer email provided")
-        return
+        return False
     if not SMTP_PASS:
         print("Email skipped: SMTP_PASS env var not set in Render")
-        return
+        return False
     try:
         svc = SERVICES.get(data.get("message_type", ""), {})
         price = svc.get("price", 0)
@@ -138,8 +138,10 @@ def send_confirmation_email(data):
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, data["email"], msg.as_string())
         print(f"Confirmation email sent to {data['email']}")
+        return True
     except Exception as e:
         print(f"Email send failed: {e}")
+        return False
 
 
 # ---- HOME ----
@@ -428,8 +430,11 @@ def test_email():
             "date": "2026-06-15",
             "time": "10:00",
         }
-        send_confirmation_email(test_data)
-        return jsonify({"status": "Test email sent!", "to": data["email"]})
+        result = send_confirmation_email(test_data)
+        if result:
+            return jsonify({"status": "Email sent successfully!", "to": data["email"]})
+        else:
+            return jsonify({"error": "Email failed. Check Render logs for details. Make sure SMTP_USER and SMTP_PASS are set in Environment tab."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
