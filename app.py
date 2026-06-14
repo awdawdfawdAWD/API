@@ -16,6 +16,8 @@ CORS(app)
 
 API_KEY = "bels-magic-hands-2026"
 
+APP_START_TIME = time.time()
+
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
 
 SERVICES = {
@@ -366,6 +368,30 @@ def create_appointment():
     return jsonify(dict(row)), 201
 
 
+ # --- Change here --- #
+def format_uptime(seconds):
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+
+    parts = []
+
+    if days:
+        parts.append(f"{days}d")
+
+    if hours:
+        parts.append(f"{hours}h")
+
+    if minutes:
+        parts.append(f"{minutes}m")
+
+    if secs or not parts:
+        parts.append(f"{secs}s")
+
+    return " ".join(parts)
+
+
 @app.route("/api/appointments/<int:appt_id>", methods=["PATCH"])
 @require_api_key
 def update_appointment(appt_id):
@@ -408,10 +434,23 @@ def delete_appointment(appt_id):
         conn.commit()
     return jsonify({"message": "Appointment deleted"})
 
+# -- Old helth check -- #
+# @app.route("/api/health", methods=["GET"])
+# def health():
+    # return jsonify({"status": "ok"})
 
+# --  New Health Check -- #
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    uptime_seconds = int(time.time() - APP_START_TIME)
+
+    return jsonify({
+        "status": "online",
+        "uptime": uptime_seconds,
+        "uptime_human": format_uptime(uptime_seconds),
+        "started_at": int(APP_START_TIME),
+        "timestamp": int(time.time())
+    })
 
 
 @app.route("/api/test-email", methods=["POST"])
