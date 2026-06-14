@@ -15,6 +15,9 @@ import json
 app = Flask(__name__)
 CORS(app)
 
+ONLINE_USERS = {}
+ONLINE_TIMEOUT = 60
+
 API_KEY = "bels-magic-hands-2026"
 
 APP_START_TIME = time.time()
@@ -373,6 +376,46 @@ def create_appointment():
 
     return jsonify(dict(row)), 201
 
+# -- Online People counter -- #
+@app.route("/api/online", methods=["POST"])
+def heartbeat():
+    visitor_id = request.json.get("visitor_id")
+
+    if not visitor_id:
+        return jsonify({"error": "visitor_id required"}), 400
+
+    ONLINE_USERS[visitor_id] = time.time()
+
+    now = time.time()
+
+    expired = [
+        uid for uid, last_seen in ONLINE_USERS.items()
+        if now - last_seen > ONLINE_TIMEOUT
+    ]
+
+    for uid in expired:
+        del ONLINE_USERS[uid]
+
+    return jsonify({
+        "online": len(ONLINE_USERS)
+    })
+
+
+@app.route("/api/online", methods=["GET"])
+def get_online():
+    now = time.time()
+
+    expired = [
+        uid for uid, last_seen in ONLINE_USERS.items()
+        if now - last_seen > ONLINE_TIMEOUT
+    ]
+
+    for uid in expired:
+        del ONLINE_USERS[uid]
+
+    return jsonify({
+        "online": len(ONLINE_USERS)
+    })
 
  # --- Change here --- #
 def format_uptime(seconds):
