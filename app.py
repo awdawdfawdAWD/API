@@ -21,9 +21,8 @@ APP_START_TIME = time.time()
 
 LAST_INCIDENT = None
 
-# -- Edit change here 2nd time
 STATUS_HISTORY = []
-MAX_HISTORY = 60  # last 60 checks (~5 mins if 5s interval)
+MAX_HISTORY = 60
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
 
@@ -322,7 +321,7 @@ def get_appointments():
             rows = conn.execute(
                 "SELECT * FROM appointments WHERE status = ? ORDER BY date, time", (status,)
             ).fetchall()
-        else:LAST_INCIDENT = None
+        else:
             rows = conn.execute(
                 "SELECT * FROM appointments ORDER BY date, time"
             ).fetchall()
