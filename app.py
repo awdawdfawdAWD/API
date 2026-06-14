@@ -172,13 +172,14 @@ def home():
         }
     })
 
-# --  TOS Version -- #
+# --  TOS Version -- 
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
     return jsonify({
         "version": "2.0",
-        "updated": True,
-        "title": "Terms of Service Updated"
+        "title": "Terms of Service",
+        "effectiveDate": "2026-06-15",
+        "updated": True
     })
 
 # ---- SERVICES ----
