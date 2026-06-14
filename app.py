@@ -19,6 +19,8 @@ API_KEY = "bels-magic-hands-2026"
 
 APP_START_TIME = time.time()
 
+LAST_INCIDENT = None
+
 # -- Edit change here 2nd time
 STATUS_HISTORY = []
 MAX_HISTORY = 60  # last 60 checks (~5 mins if 5s interval)
@@ -320,7 +322,7 @@ def get_appointments():
             rows = conn.execute(
                 "SELECT * FROM appointments WHERE status = ? ORDER BY date, time", (status,)
             ).fetchall()
-        else:
+        else:LAST_INCIDENT = None
             rows = conn.execute(
                 "SELECT * FROM appointments ORDER BY date, time"
             ).fetchall()
@@ -447,26 +449,51 @@ def delete_appointment(appt_id):
 # --  New Health Check -- #
 @app.route("/api/health", methods=["GET"])
 def health():
+
+    global LAST_INCIDENT
+
+    start = time.perf_counter()
+
     uptime_seconds = int(time.time() - APP_START_TIME)
 
-    # determine real status
     status = "online"
+
+    latency = round(
+        (time.perf_counter() - start) * 1000,
+        2
+    )
+
+    if status != "online":
+        LAST_INCIDENT = int(time.time())
 
     entry = {
         "time": int(time.time()),
         "status": status,
-        "uptime": uptime_seconds
+        "uptime": uptime_seconds,
+        "latency": latency
     }
 
     STATUS_HISTORY.append(entry)
 
-    # keep only last N entries
     if len(STATUS_HISTORY) > MAX_HISTORY:
         STATUS_HISTORY.pop(0)
+
+    online_count = sum(
+        1 for h in STATUS_HISTORY
+        if h["status"] == "online"
+    )
+
+    availability = round(
+        (online_count / len(STATUS_HISTORY)) * 100,
+        2
+    ) if STATUS_HISTORY else 100
 
     return jsonify({
         "status": status,
         "uptime": uptime_seconds,
+        "latency": latency,
+        "availability": availability,
+        "lastIncident": LAST_INCIDENT,
         "history": STATUS_HISTORY
     })
 
