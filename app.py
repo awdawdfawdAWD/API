@@ -10,6 +10,7 @@ import urllib.request
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -17,6 +18,10 @@ CORS(app)
 API_KEY = "bels-magic-hands-2026"
 
 APP_START_TIME = time.time()
+
+# -- Edit change here 2nd time
+STATUS_HISTORY = []
+MAX_HISTORY = 60  # last 60 checks (~5 mins if 5s interval)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
 
@@ -444,12 +449,25 @@ def delete_appointment(appt_id):
 def health():
     uptime_seconds = int(time.time() - APP_START_TIME)
 
+    # determine real status
+    status = "online"
+
+    entry = {
+        "time": int(time.time()),
+        "status": status,
+        "uptime": uptime_seconds
+    }
+
+    STATUS_HISTORY.append(entry)
+
+    # keep only last N entries
+    if len(STATUS_HISTORY) > MAX_HISTORY:
+        STATUS_HISTORY.pop(0)
+
     return jsonify({
-        "status": "online",
+        "status": status,
         "uptime": uptime_seconds,
-        "uptime_human": format_uptime(uptime_seconds),
-        "started_at": int(APP_START_TIME),
-        "timestamp": int(time.time())
+        "history": STATUS_HISTORY
     })
 
 
