@@ -14,12 +14,10 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Security layer parameters pulled from Render Environment variables
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placeholder")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
-# Enforced cross-origin script authorization 
 CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
 
 ONLINE_USERS = {}
@@ -147,7 +145,7 @@ def send_confirmation_email(data):
         return False
 
 
-# --- Premium Business Cyberpunk UI ---
+# --- Premium Business Cyberpunk UI with Fire Ember Background Engine ---
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -155,14 +153,18 @@ LOGIN_HTML = """
     <meta charset="UTF-8">
     <title>Core Login Matrix</title>
     <style>
-        :root { --neon: #ff6b8b; --dark: #0a0809; --panel: #140f11; }
-        body { background: var(--dark); color: #fdfafb; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background: var(--panel); border: 1px solid rgba(255,107,139,0.15); border-radius: 16px; padding: 40px; width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); opacity: 0; transform: translateY(15px); animation: enter 0.5s ease-out forwards; }
-        h2 { text-transform: uppercase; letter-spacing: 2px; color: var(--neon); margin: 0 0 8px; text-align: center; font-size: 20px; }
-        .sub { color: #807175; text-align: center; font-size: 13px; margin-bottom: 30px; }
-        input { width: 100%; padding: 14px; background: #1c1518; border: 1px solid #362a2d; border-radius: 8px; color: #fff; box-sizing: border-box; text-align: center; outline: none; margin-bottom: 20px; font-size: 14px; transition: border 0.2s; }
-        input:focus { border-color: var(--neon); }
-        button { width: 100%; padding: 14px; background: var(--neon); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.1s; }
+        :root { --neon: #ff6b8b; --dark: #000000; --panel: rgba(20, 15, 17, 0.85); }
+        body { background: var(--dark); color: #fdfafb; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; position: relative; }
+        
+        /* Canvas layer for the glowing fire ember particles */
+        #emberCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+
+        .login-card { position: relative; z-index: 2; background: var(--panel); border: 1px solid rgba(255,107,139,0.25); border-radius: 16px; padding: 40px; width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(255, 107, 139, 0.1); backdrop-filter: blur(8px); opacity: 0; transform: translateY(15px); animation: enter 0.5s ease-out forwards; }
+        h2 { text-transform: uppercase; letter-spacing: 2px; color: var(--neon); margin: 0 0 8px; text-align: center; font-size: 20px; text-shadow: 0 0 10px rgba(255, 107, 139, 0.4); }
+        .sub { color: #a39296; text-align: center; font-size: 13px; margin-bottom: 30px; }
+        input { width: 100%; padding: 14px; background: rgba(28, 21, 24, 0.9); border: 1px solid #4a3a3d; border-radius: 8px; color: #fff; box-sizing: border-box; text-align: center; outline: none; margin-bottom: 20px; font-size: 14px; transition: all 0.2s; }
+        input:focus { border-color: var(--neon); box-shadow: 0 0 10px rgba(255, 107, 139, 0.3); }
+        button { width: 100%; padding: 14px; background: var(--neon); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.1s, background-color 0.2s; box-shadow: 0 4px 15px rgba(255, 107, 139, 0.4); }
         button:hover { background: #e05372; }
         button:active { transform: scale(0.99); }
         .err { color: #ff4a4a; text-align: center; font-size: 13px; margin-bottom: 15px; animation: jitter 0.3s ease; }
@@ -171,6 +173,8 @@ LOGIN_HTML = """
     </style>
 </head>
 <body>
+    <canvas id="emberCanvas"></canvas>
+
     <div class="login-card">
         <h2>System Access</h2>
         <div class="sub">Provide structural decryption passkey</div>
@@ -180,6 +184,77 @@ LOGIN_HTML = """
             <button type="submit">INITIALIZE CONTROL MATRIX</button>
         </form>
     </div>
+
+    <script>
+        const canvas = document.getElementById('emberCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const particles = [];
+        const particleCount = 65;
+
+        class Ember {
+            constructor() {
+                this.reset();
+                this.y = Math.random() * canvas.height; // randomize initialization heights
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + Math.random() * 20;
+                this.size = Math.random() * 3 + 1;
+                this.speedY = Math.random() * 1.2 + 0.5;
+                this.speedX = Math.random() * 0.6 - 0.3;
+                // Vary between fiery bright orange, deep gold, and amber-red tones
+                const colors = ['rgba(255, 69, 0, ', 'rgba(255, 140, 0, ', 'rgba(255, 107, 139, ', 'rgba(218, 165, 32, '];
+                this.colorBase = colors[Math.floor(Math.random() * colors.length)];
+                this.alpha = Math.random() * 0.5 + 0.4;
+                this.fadeSpeed = Math.random() * 0.005 + 0.002;
+                this.wobble = Math.random() * 2;
+                this.wobbleSpeed = Math.random() * 0.02;
+            }
+            update() {
+                this.y -= this.speedY;
+                this.x += this.speedX + Math.sin(this.wobble) * 0.2;
+                this.wobble += this.wobbleSpeed;
+                this.alpha -= this.fadeSpeed;
+
+                if (this.y < -10 || this.alpha <= 0 || this.x < 0 || this.x > canvas.width) {
+                    this.reset();
+                }
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.colorBase + this.alpha + ')';
+                ctx.shadowBlur = this.size * 3;
+                ctx.shadowColor = '#ff4500';
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Ember());
+        }
+
+        function animate() {
+            ctx.shadowBlur = 0; // Clear shadow properties before clearing background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // Trail effect over the pure black background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
 </body>
 </html>
 """
@@ -788,3 +863,5 @@ threading.Thread(target=_keep_alive, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+
+```
