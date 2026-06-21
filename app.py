@@ -235,6 +235,8 @@ DASHBOARD_HTML = """
         /* Quick-Action Controls */
         .btn-action { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; text-align: center; display: block; text-decoration: none; }
         .btn-action:hover { background: var(--neon); color: #fff; }
+        
+        .json-output { background: #0d090a; color: #00ffcc; font-family: monospace; padding: 15px; border-radius: 6px; font-size: 12px; overflow-x: auto; max-height: 300px; white-space: pre-wrap; margin-top: 15px; border: 1px solid rgba(0,255,204,0.1); }
 
         @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; box-shadow: 0 0 12px #00ffcc; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -250,8 +252,8 @@ DASHBOARD_HTML = """
             </div>
             <div class="menu-list">
                 <button class="nav-btn active" onclick="navigatePanel(this, 'appointments')">📋 Appointments Stream</button>
-                <button class="nav-btn" onclick="navigatePanel(this, 'diagnostics')">🛰️ Diagnostics Engine</button>
-                <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Core Databases</button>
+                <button class="nav-btn" onclick="navigatePanel(this, 'diagnostics')">🛰️ Health & Diagnostics</button>
+                <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Secondary Database Records</button>
             </div>
         </div>
         <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
@@ -268,7 +270,7 @@ DASHBOARD_HTML = """
             <div id="pane-appointments" class="view-pane active">
                 <div class="grid-layout">
                     <div class="panel">
-                        <h3>Active Queue Feed</h3>
+                        <h3>Appointments Storage Logs</h3>
                         {% if appointments %}
                             {% for appt in appointments %}
                             <div class="record-card">
@@ -288,10 +290,11 @@ DASHBOARD_HTML = """
                         {% endif %}
                     </div>
                     <div class="panel">
-                        <h3>Quick Navigation Shortcuts</h3>
-                        <a href="/api/appointments" target="_blank" class="btn-action">📂 Open Raw JSON Matrix</a>
-                        <a href="/api/services" target="_blank" class="btn-action">🏷️ Inspect Active Services</a>
-                        <a href="/api/tos" target="_blank" class="btn-action">📄 Terms API Node</a>
+                        <h3>View Internal Application Schemas</h3>
+                        <button class="btn-action" onclick="fetchInternalData('/api/internal/appointments', 'appointments-json')">Load Appointments Matrix</button>
+                        <button class="btn-action" onclick="fetchInternalData('/api/services', 'appointments-json')">Inspect Active Services</button>
+                        <button class="btn-action" onclick="fetchInternalData('/api/tos', 'appointments-json')">View Terms API Node</button>
+                        <div id="appointments-json" class="json-output" style="display:none;"></div>
                     </div>
                 </div>
             </div>
@@ -306,9 +309,10 @@ DASHBOARD_HTML = """
                         <div class="info-row"><label>Node Security Encryption</label><value>AES-GCM TLSv1.3</value></div>
                     </div>
                     <div class="panel">
-                        <h3>Action Triggers</h3>
-                        <a href="/api/health" target="_blank" class="btn-action">🩺 Inspect Raw Diagnostics Feed</a>
+                        <h3>System Actions</h3>
+                        <button class="btn-action" onclick="fetchInternalData('/api/health', 'health-json')">Fetch Health Matrix</button>
                         <button class="btn-action" onclick="window.location.reload();">🔄 Recalibrate Console</button>
+                        <div id="health-json" class="json-output" style="display:none;"></div>
                     </div>
                 </div>
             </div>
@@ -322,10 +326,11 @@ DASHBOARD_HTML = """
                         <div class="info-row"><label>Active Tracking Monitors</label><value>Broadcasting</value></div>
                     </div>
                     <div class="panel">
-                        <h3>Protected Operations</h3>
-                        <a href="/api/records" target="_blank" class="btn-action">🗄️ View Client Database Records</a>
-                        <a href="/api/game-scores" target="_blank" class="btn-action">🕹️ View Miniature Game Registers</a>
-                        <a href="/api/leaderboard" target="_blank" class="btn-action">🏆 View High Scores Matrix</a>
+                        <h3>Access Sub-Tables</h3>
+                        <button class="btn-action" onclick="fetchInternalData('/api/records', 'records-json')">Load Client Database Records</button>
+                        <button class="btn-action" onclick="fetchInternalData('/api/game-scores', 'records-json')">Load Miniature Game Registers</button>
+                        <button class="btn-action" onclick="fetchInternalData('/api/leaderboard', 'records-json')">Load High Scores Matrix</button>
+                        <div id="records-json" class="json-output" style="display:none;"></div>
                     </div>
                 </div>
             </div>
@@ -338,6 +343,19 @@ DASHBOARD_HTML = """
             document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('pane-' + paneId).classList.add('active');
+        }
+
+        async function fetchInternalData(endpoint, outputId) {
+            const container = document.getElementById(outputId);
+            try {
+                const r = await fetch(endpoint);
+                const data = await r.json();
+                container.style.display = "block";
+                container.innerText = JSON.stringify(data, null, 2);
+            } catch (err) {
+                container.style.display = "block";
+                container.innerText = "Error pulling internal data feed.";
+            }
         }
 
         async function syncTelemetry() {
@@ -398,6 +416,15 @@ def admin_dashboard():
 def admin_logout():
     session.clear()
     return redirect(url_for("admin_login"))
+
+
+# --- Secure Internal Admin Bridge to prevent browser Authorization Errors ---
+@app.route("/api/internal/appointments", methods=["GET"])
+@require_admin_session
+def get_internal_appointments():
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
+    return jsonify([dict(r) for r in rows])
 
 
 @app.route("/api/tos", methods=["GET"])
