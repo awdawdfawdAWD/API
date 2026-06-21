@@ -14,10 +14,12 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
+# Security layer parameters pulled from Render Environment variables
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placeholder")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
+# Enforced cross-origin script authorization 
 CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
 
 ONLINE_USERS = {}
@@ -863,5 +865,3 @@ threading.Thread(target=_keep_alive, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
-
-```
