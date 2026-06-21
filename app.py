@@ -699,10 +699,11 @@ def create_appointment():
         conn.commit()
         row = conn.execute("SELECT * FROM appointments WHERE id = ?", (cur.lastrowid,)).fetchone()
 
+    # Pass an isolated, explicit dictionary to prevent multi-thread connection cross-pollution
     data_with_price = dict(row)
     threading.Thread(target=send_confirmation_email, args=(data_with_price,), daemon=True).start()
 
-    return jsonify(dict(row)), 201
+    return jsonify(data_with_price), 201
 
 
 @app.route("/api/appointments/<int:appt_id>", methods=["PATCH"])
@@ -722,7 +723,10 @@ def update_appointment(appt_id):
         if "name" in data:
             conn.execute("UPDATE appointments SET name = ? WHERE id = ?", (data["name"], appt_id))
         if "message_type" in data:
-            conn.execute("UPDATE appointments SET message_type = ? WHERE id = ?", (data["message_type"], appt_id))
+            # Re-calculate correct price upon service modifications
+            svc = SERVICES.get(data["message_type"], {})
+            price = svc.get("price", 0)
+            conn.execute("UPDATE appointments SET message_type = ?, price = ? WHERE id = ?", (data["message_type"], price, appt_id))
         if "date" in data:
             conn.execute("UPDATE appointments SET date = ? WHERE id = ?", (data["date"], appt_id))
         if "time" in data:
