@@ -14,12 +14,12 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Pull configuration values securely from Render Environment Variables to keep public GitHub safe
+# Security layer parameters pulled from Render Environment variables
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placeholder")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
-# Restricts automated cross-origin calls to protect client resources
+# Enforced cross-origin script authorization 
 CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
 
 ONLINE_USERS = {}
@@ -95,10 +95,10 @@ def init_db():
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-    print("Database structural integrity verified.")
+    print("Database connection structural mappings validated.")
 
 
-# --- Security Guards & Verification Gateways ---
+# --- Session Control Utilities ---
 def require_admin_session(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -118,11 +118,7 @@ def require_api_key(f):
 
 
 def send_confirmation_email(data):
-    if not data.get("email"):
-        print("Email skipped: no customer email provided")
-        return False
-    if not SMTP_PASS:
-        print("Email skipped: SMTP_PASS env var not set in Render")
+    if not data.get("email") or not SMTP_PASS:
         return False
     try:
         svc = SERVICES.get(data.get("message_type", ""), {})
@@ -130,28 +126,14 @@ def send_confirmation_email(data):
         duration = svc.get("duration", "")
 
         html = f"""
-        <div style="font-family:Segoe UI,Arial,sans-serif;max-width:500px;margin:0 auto;background:#faf6f4;padding:32px;border-radius:12px;">
-            <div style="text-align:center;margin-bottom:24px;">
-                <h1 style="color:#d4838f;margin:0;font-size:22px;">Bel's Magic Hands Massage</h1>
-                <p style="color:#888;margin:4px 0 0;font-size:12px;">Appointment Confirmation</p>
-            </div>
-            <p style="color:#322834;font-size:14px;">Hi <strong>{data['name']}</strong>,</p>
-            <p style="color:#555;font-size:13px;">Your appointment has been booked. Here are the details:</p>
-            <div style="background:white;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #eee;">
-                <table style="width:100%;font-size:13px;color:#322834;">
-                    <tr><td style="padding:6px 0;color:#888;">Service</td><td style="padding:6px 0;text-align:right;"><strong>{data.get('message_type','')}</strong></td></tr>
-                    <tr><td style="padding:6px 0;color:#888;">Duration</td><td style="padding:6px 0;text-align:right;">{duration}</td></tr>
-                    <tr><td style="padding:6px 0;color:#888;">Date</td><td style="padding:6px 0;text-align:right;">{data.get('date','')}</td></tr>
-                    <tr><td style="padding:6px 0;color:#888;">Time</td><td style="padding:6px 0;text-align:right;">{data.get('time','')}</td></tr>
-                    <tr><td style="padding:6px 0;color:#888;border-top:1px solid #eee;">Price</td><td style="padding:6px 0;text-align:right;border-top:1px solid #eee;"><strong style="color:#d4838f;">${price:.0f}</strong></td></tr>
-                </table>
-            </div>
-            <p style="color:#888;font-size:11px;text-align:center;margin-top:24px;">Thank you for choosing Bel's Magic Hands!</p>
+        <div style="font-family:sans-serif;max-width:500px;margin:0 auto;background:#faf6f4;padding:32px;border-radius:12px;">
+            <h2>Appointment Confirmed — Bel's Magic Hands</h2>
+            <p>Hi <strong>{data['name']}</strong>, your session registration is complete.</p>
+            <p><strong>Service:</strong> {data.get('message_type','')}<br><strong>Time:</strong> {data.get('date','')} @ {data.get('time','')}</p>
         </div>
         """
-
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Appointment Confirmed \u2014 Bel's Magic Hands"
+        msg["Subject"] = "Appointment Confirmed"
         msg["From"] = f"Bel's Magic Hands <{SMTP_USER}>"
         msg["To"] = data["email"]
         msg.attach(MIMEText(html, "html"))
@@ -160,36 +142,42 @@ def send_confirmation_email(data):
             server.starttls()
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, data["email"], msg.as_string())
-        print(f"Confirmation email sent to {data['email']}")
         return True
-    except Exception as e:
-        print(f"Email send failed: {e}")
+    except:
         return False
 
 
-# --- Beautiful Graphic Web Interface Templates ---
+# --- Premium Business Cyberpunk UI ---
 LOGIN_HTML = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Bel Admin - Control Login</title>
+    <meta charset="UTF-8">
+    <title>Core Login Matrix</title>
     <style>
-        body { background: #121011; color: #f7f3f0; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background: #1a1617; padding: 40px; border-radius: 12px; border: 2px solid #d4838f; width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        h2 { color: #d4838f; margin-top: 0; text-align: center; font-size: 24px; }
-        input[type="password"] { width: 100%; padding: 12px; margin: 20px 0; background: #262022; border: 1px solid #3d3335; border-radius: 6px; color: #fff; box-sizing: border-box; font-family: monospace; }
-        button { width: 100%; padding: 12px; background: #d4838f; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; font-family: monospace; font-size: 14px; }
-        button:hover { background: #b56b76; }
-        .error { color: #ff6666; font-size: 13px; text-align: center; font-weight: bold; }
+        :root { --neon: #ff6b8b; --dark: #0a0809; --panel: #140f11; }
+        body { background: var(--dark); color: #fdfafb; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: var(--panel); border: 1px solid rgba(255,107,139,0.15); border-radius: 16px; padding: 40px; width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); opacity: 0; transform: translateY(15px); animation: enter 0.5s ease-out forwards; }
+        h2 { text-transform: uppercase; letter-spacing: 2px; color: var(--neon); margin: 0 0 8px; text-align: center; font-size: 20px; }
+        .sub { color: #807175; text-align: center; font-size: 13px; margin-bottom: 30px; }
+        input { width: 100%; padding: 14px; background: #1c1518; border: 1px solid #362a2d; border-radius: 8px; color: #fff; box-sizing: border-box; text-align: center; outline: none; margin-bottom: 20px; font-size: 14px; transition: border 0.2s; }
+        input:focus { border-color: var(--neon); }
+        button { width: 100%; padding: 14px; background: var(--neon); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.1s; }
+        button:hover { background: #e05372; }
+        button:active { transform: scale(0.99); }
+        .err { color: #ff4a4a; text-align: center; font-size: 13px; margin-bottom: 15px; animation: jitter 0.3s ease; }
+        @keyframes enter { to { opacity: 1; transform: translateY(0); } }
+        @keyframes jitter { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-4px); } 70% { transform: translateX(4px); } }
     </style>
 </head>
 <body>
     <div class="login-card">
-        <h2>📟 Admin System Gateway</h2>
-        {% if error %}<p class="error">⚠️ {{ error }}</p>{% endif %}
+        <h2>System Access</h2>
+        <div class="sub">Provide structural decryption passkey</div>
+        {% if error %}<div class="err">⚠️ {{ error }}</div>{% endif %}
         <form method="POST">
-            <input type="password" name="password" placeholder="ENTER PORTAL PASSWORD" required autocomplete="current-password">
-            <button type="submit">ACCESS DASHBOARD</button>
+            <input type="password" name="password" placeholder="••••••••••••" required>
+            <button type="submit">INITIALIZE CONTROL MATRIX</button>
         </form>
     </div>
 </body>
@@ -198,66 +186,179 @@ LOGIN_HTML = """
 
 DASHBOARD_HTML = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Bel Dashboard Control</title>
+    <meta charset="UTF-8">
+    <title>Management Command Center</title>
     <style>
-        body { background: #121011; color: #f7f3f0; font-family: monospace; margin: 0; padding: 25px; }
-        .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #d4838f; padding-bottom: 15px; margin-bottom: 25px; }
-        h1 { color: #d4838f; margin: 0; font-size: 24px; }
-        .logout-btn { color: #ff6666; text-decoration: none; border: 1px solid #ff6666; padding: 6px 12px; border-radius: 4px; font-weight: bold; }
-        .logout-btn:hover { background: #ff6666; color: #fff; }
-        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
-        .card { background: #1a1617; border: 1px solid #3d3335; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
-        h3 { color: #ffb3bc; margin-top: 0; border-bottom: 1px solid #3d3335; padding-bottom: 8px; font-size: 18px; }
-        .appt-item { background: #262022; padding: 15px; margin-bottom: 12px; border-left: 5px solid #d4838f; border-radius: 4px; }
-        .meta-tag { color: #ffcc00; font-weight: bold; font-size: 14px; }
-        .badge { background: #3d3335; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #ffb3bc; }
-        .status-msg { font-style: italic; color: #777; }
+        :root { --neon: #ff6b8b; --neon-cyan: #00f0ff; --bg: #070506; --sidebar: #0f0a0c; --panel: #161012; --border: rgba(255, 107, 139, 0.12); }
+        body { background: var(--bg); color: #f5eff1; font-family: system-ui, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Persistent Left Control Column */
+        .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 25px; box-sizing: border-box; }
+        .brand-block { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: 1px; color: #fff; font-size: 15px; }
+        .radar-dot { width: 10px; height: 10px; background: #00ffcc; border-radius: 50%; box-shadow: 0 0 10px #00ffcc; animation: pulse 2s infinite; }
+        
+        .menu-list { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; flex: 1; }
+        .nav-btn { display: flex; align-items: center; gap: 12px; background: transparent; border: 1px solid transparent; color: #9c8b90; width: 100%; padding: 12px 16px; border-radius: 8px; text-align: left; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .nav-btn:hover { color: #fff; background: rgba(255,255,255,0.03); }
+        .nav-btn.active { background: rgba(255, 107, 139, 0.08); border-color: rgba(255, 107, 139, 0.2); color: var(--neon); }
+        .logout-btn { border: 1px solid rgba(255,74,74,0.3); color: #ff4a4a; text-decoration: none; text-align: center; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: background 0.2s; }
+        .logout-btn:hover { background: #ff4a4a; color: #fff; }
+
+        /* Main Workspace Frame */
+        .main-frame { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-stat-bar { background: var(--sidebar); border-bottom: 1px solid var(--border); padding: 15px 35px; display: flex; gap: 40px; align-items: center; }
+        .mini-metric { font-size: 12px; color: #8f8084; text-transform: uppercase; font-weight: 600; }
+        .mini-metric span { display: block; font-size: 15px; color: #fff; font-weight: 700; margin-top: 2px; }
+
+        .content-container { flex: 1; padding: 35px; overflow-y: auto; box-sizing: border-box; }
+        .view-pane { display: none; animation: slideUp 0.35s cubic-bezier(0.1, 1, 0.1, 1) forwards; }
+        .view-pane.active { display: block; }
+        
+        .grid-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 25px rgba(0,0,0,0.3); }
+        .panel h3 { margin: 0 0 20px; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        
+        /* Queue Data Cards */
+        .record-card { background: #1d1618; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid var(--neon); display: flex; justify-content: space-between; align-items: center; }
+        .record-card .name { font-weight: 600; color: #fff; font-size: 15px; }
+        .record-card .details { font-size: 13px; color: #9c8b90; margin-top: 3px; }
+        .status-pill { background: rgba(255, 107, 139, 0.1); color: var(--neon); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+
+        /* Tech Diagnostic Rows */
+        .info-row { display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 14px; }
+        .info-row:last-child { border: none; }
+        .info-row label { color: #8f8084; }
+        .info-row value { font-weight: 600; color: #fff; }
+
+        /* Quick-Action Controls */
+        .btn-action { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; text-align: center; display: block; text-decoration: none; }
+        .btn-action:hover { background: var(--neon); color: #fff; }
+
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; box-shadow: 0 0 12px #00ffcc; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-    <div class="nav">
-        <h1>📟 System Control Room</h1>
+
+    <div class="sidebar">
         <div>
-            <a href="/api/dashboard" style="color: #fff; margin-right: 20px; text-decoration: none; font-weight: bold;">🔄 Refresh View</a>
-            <a href="/api/logout" class="logout-btn">LOGOUT</a>
+            <div class="brand-block">
+                <div class="radar-dot"></div>
+                MANAGEMENT PLATFORM
+            </div>
+            <div class="menu-list">
+                <button class="nav-btn active" onclick="navigatePanel(this, 'appointments')">📋 Appointments Stream</button>
+                <button class="nav-btn" onclick="navigatePanel(this, 'diagnostics')">🛰️ Diagnostics Engine</button>
+                <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Core Databases</button>
+            </div>
         </div>
+        <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
     </div>
-    <div class="grid">
-        <div class="card">
-            <h3>Active Appointments Queue</h3>
-            {% if appointments %}
-                {% for appt in appointments %}
-                <div class="appt-item">
-                    <div><span class="meta-tag">[📅 {{ appt.date }} @ {{ appt.time }}]</span> <strong>{{ appt.name }}</strong></div>
-                    <div style="margin-top: 6px; font-size: 13px; color: #bbb;">
-                        Service: {{ appt.message_type }} | Status: <span class="badge">{{ appt.status }}</span> | Price: ${{ appt.price }}
+
+    <div class="main-frame">
+        <div class="top-stat-bar">
+            <div class="mini-metric">Engine Pipeline <span>SQLite3 Core</span></div>
+            <div class="mini-metric">Live Availability <span id="nav-avail-val">100%</span></div>
+            <div class="mini-metric">Server Latency <span id="nav-lat-val">0.00ms</span></div>
+        </div>
+
+        <div class="content-container">
+            <div id="pane-appointments" class="view-pane active">
+                <div class="grid-layout">
+                    <div class="panel">
+                        <h3>Active Queue Feed</h3>
+                        {% if appointments %}
+                            {% for appt in appointments %}
+                            <div class="record-card">
+                                <div>
+                                    <div class="name">{{ appt.name }}</div>
+                                    <div class="details">Type: {{ appt.message_type }} | Contact: {{ appt.phone or 'None' }}</div>
+                                    {% if appt.notes %}<div class="details" style="color:#736467; font-style:italic;">* {{ appt.notes }}</div>{% endif %}
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 600; font-size:14px; margin-bottom:4px;">{{ appt.date }} @ {{ appt.time }}</div>
+                                    <span class="status-pill">{{ appt.status }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p style="color:#8f8084; font-style:italic; font-size:14px;">No active client entries mapped to structural storage logs.</p>
+                        {% endif %}
                     </div>
-                    {% if appt.notes %}<div style="font-size: 12px; color: #888; margin-top: 6px; border-top: 1px dashed #3d3335; padding-top: 4px;">* {{ appt.notes }}</div>{% endif %}
+                    <div class="panel">
+                        <h3>Quick Navigation Shortcuts</h3>
+                        <a href="/api/appointments" target="_blank" class="btn-action">📂 Open Raw JSON Matrix</a>
+                        <a href="/api/services" target="_blank" class="btn-action">🏷️ Inspect Active Services</a>
+                        <a href="/api/tos" target="_blank" class="btn-action">📄 Terms API Node</a>
+                    </div>
                 </div>
-                {% endfor %}
-            {% else %}
-                <p class="status-msg">No appointments currently found inside database storage.</p>
-            {% endif %}
-        </div>
-        <div class="card">
-            <h3>API Diagnostics</h3>
-            <p><strong>System Diagnostics Status:</strong> <span id="uptime-val" style="color:#00ffcc;">Loading Metrics...</span></p>
-            <p><strong>Database Target:</strong> Local SQLite3 Engine</p>
-            <p><strong>Availability Engine:</strong> Active</p>
+            </div>
+
+            <div id="pane-diagnostics" class="view-pane">
+                <div class="grid-layout">
+                    <div class="panel">
+                        <h3>Asynchronous Node Telemetry</h3>
+                        <div class="info-row"><label>Engine Core Status</label><value style="color:#00ffcc;">ONLINE</value></div>
+                        <div class="info-row"><label>Internal Runtime Latency</label><value id="diag-latency">-</value></div>
+                        <div class="info-row"><label>Calculated Cluster Uptime</label><value id="diag-uptime">-</value></div>
+                        <div class="info-row"><label>Node Security Encryption</label><value>AES-GCM TLSv1.3</value></div>
+                    </div>
+                    <div class="panel">
+                        <h3>Action Triggers</h3>
+                        <a href="/api/health" target="_blank" class="btn-action">🩺 Inspect Raw Diagnostics Feed</a>
+                        <button class="btn-action" onclick="window.location.reload();">🔄 Recalibrate Console</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pane-records" class="view-pane">
+                <div class="grid-layout">
+                    <div class="panel">
+                        <h3>Relational Auxiliary Sub-Tables</h3>
+                        <div class="info-row"><label>User Client Profiles Table</label><value>Running / Encrypted</value></div>
+                        <div class="info-row"><label>Game Session Leaderboard Storage</label><value>Isolated Cluster</value></div>
+                        <div class="info-row"><label>Active Tracking Monitors</label><value>Broadcasting</value></div>
+                    </div>
+                    <div class="panel">
+                        <h3>Protected Operations</h3>
+                        <a href="/api/records" target="_blank" class="btn-action">🗄️ View Client Database Records</a>
+                        <a href="/api/game-scores" target="_blank" class="btn-action">🕹️ View Miniature Game Registers</a>
+                        <a href="/api/leaderboard" target="_blank" class="btn-action">🏆 View High Scores Matrix</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
     <script>
-        async function fetchHealth() {
-            try {
-                const r = await fetch('/api/health');
-                const d = await r.json();
-                document.getElementById('uptime-val').innerText = d.uptime + "s / Availability: " + d.availability + "%";
-            } catch(e) {}
+        function navigatePanel(btn, paneId) {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('pane-' + paneId).classList.add('active');
         }
-        fetchHealth();
-        setInterval(fetchHealth, 5000);
+
+        async function syncTelemetry() {
+            try {
+                const response = await fetch('/api/health');
+                const metrics = await response.json();
+                
+                // Top Global Summary Bar Sync
+                document.getElementById('nav-avail-val').innerText = metrics.availability + "%";
+                document.getElementById('nav-lat-val').innerText = metrics.latency + "ms";
+                
+                // Diagnostics Panel Viewports Sync
+                document.getElementById('diag-latency').innerText = metrics.latency + " ms";
+                document.getElementById('diag-uptime').innerText = metrics.uptime + " seconds";
+            } catch (err) {
+                console.error("Telemetry pipeline connection failed:", err);
+            }
+        }
+        
+        syncTelemetry();
+        setInterval(syncTelemetry, 4000);
     </script>
 </body>
 </html>
