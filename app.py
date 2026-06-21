@@ -1,29 +1,31 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import sqlite3
 import os
+import json
+import time
+import sqlite3
+import smtplib
+import threading
+import urllib.request
 from datetime import datetime
 from functools import wraps
-import threading
-import time
-import urllib.request
-import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import json
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+
+# Pull configuration values securely from Render Environment Variables to keep public GitHub safe
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placeholder")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
+API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
+
+# Restricts automated cross-origin calls to protect client resources
+CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
 
 ONLINE_USERS = {}
 ONLINE_TIMEOUT = 60
-
-API_KEY = "bels-magic-hands-2026"
-
 APP_START_TIME = time.time()
-
 LAST_INCIDENT = None
-
 STATUS_HISTORY = []
 MAX_HISTORY = 60
 
@@ -93,7 +95,17 @@ def init_db():
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-    print("Database initialized.")
+    print("Database structural integrity verified.")
+
+
+# --- Security Guards & Verification Gateways ---
+def require_admin_session(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return decorated
 
 
 def require_api_key(f):
@@ -155,24 +167,138 @@ def send_confirmation_email(data):
         return False
 
 
-# ---- HOME ----
+# --- Beautiful Graphic Web Interface Templates ---
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bel Admin - Control Login</title>
+    <style>
+        body { background: #121011; color: #f7f3f0; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: #1a1617; padding: 40px; border-radius: 12px; border: 2px solid #d4838f; width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h2 { color: #d4838f; margin-top: 0; text-align: center; font-size: 24px; }
+        input[type="password"] { width: 100%; padding: 12px; margin: 20px 0; background: #262022; border: 1px solid #3d3335; border-radius: 6px; color: #fff; box-sizing: border-box; font-family: monospace; }
+        button { width: 100%; padding: 12px; background: #d4838f; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; font-family: monospace; font-size: 14px; }
+        button:hover { background: #b56b76; }
+        .error { color: #ff6666; font-size: 13px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>📟 Admin System Gateway</h2>
+        {% if error %}<p class="error">⚠️ {{ error }}</p>{% endif %}
+        <form method="POST">
+            <input type="password" name="password" placeholder="ENTER PORTAL PASSWORD" required autocomplete="current-password">
+            <button type="submit">ACCESS DASHBOARD</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
 
-@app.route("/")
-def home():
-    return jsonify({
-        "api": "Bel's Magic Hands Therapy",
-        "services": SERVICES,
-        "message": "Use /api/appointments to book",
-        "endpoints": {
-            "POST /api/appointments": "Book an appointment",
-            "GET /api/appointments": "List appointments",
-            "PATCH /api/appointments/<id>": "Update status",
-            "GET /api/services": "List services with prices",
-            "GET /api/health": "Health check"
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bel Dashboard Control</title>
+    <style>
+        body { background: #121011; color: #f7f3f0; font-family: monospace; margin: 0; padding: 25px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #d4838f; padding-bottom: 15px; margin-bottom: 25px; }
+        h1 { color: #d4838f; margin: 0; font-size: 24px; }
+        .logout-btn { color: #ff6666; text-decoration: none; border: 1px solid #ff6666; padding: 6px 12px; border-radius: 4px; font-weight: bold; }
+        .logout-btn:hover { background: #ff6666; color: #fff; }
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
+        .card { background: #1a1617; border: 1px solid #3d3335; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
+        h3 { color: #ffb3bc; margin-top: 0; border-bottom: 1px solid #3d3335; padding-bottom: 8px; font-size: 18px; }
+        .appt-item { background: #262022; padding: 15px; margin-bottom: 12px; border-left: 5px solid #d4838f; border-radius: 4px; }
+        .meta-tag { color: #ffcc00; font-weight: bold; font-size: 14px; }
+        .badge { background: #3d3335; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #ffb3bc; }
+        .status-msg { font-style: italic; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h1>📟 System Control Room</h1>
+        <div>
+            <a href="/api/dashboard" style="color: #fff; margin-right: 20px; text-decoration: none; font-weight: bold;">🔄 Refresh View</a>
+            <a href="/api/logout" class="logout-btn">LOGOUT</a>
+        </div>
+    </div>
+    <div class="grid">
+        <div class="card">
+            <h3>Active Appointments Queue</h3>
+            {% if appointments %}
+                {% for appt in appointments %}
+                <div class="appt-item">
+                    <div><span class="meta-tag">[📅 {{ appt.date }} @ {{ appt.time }}]</span> <strong>{{ appt.name }}</strong></div>
+                    <div style="margin-top: 6px; font-size: 13px; color: #bbb;">
+                        Service: {{ appt.message_type }} | Status: <span class="badge">{{ appt.status }}</span> | Price: ${{ appt.price }}
+                    </div>
+                    {% if appt.notes %}<div style="font-size: 12px; color: #888; margin-top: 6px; border-top: 1px dashed #3d3335; padding-top: 4px;">* {{ appt.notes }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="status-msg">No appointments currently found inside database storage.</p>
+            {% endif %}
+        </div>
+        <div class="card">
+            <h3>API Diagnostics</h3>
+            <p><strong>System Diagnostics Status:</strong> <span id="uptime-val" style="color:#00ffcc;">Loading Metrics...</span></p>
+            <p><strong>Database Target:</strong> Local SQLite3 Engine</p>
+            <p><strong>Availability Engine:</strong> Active</p>
+        </div>
+    </div>
+    <script>
+        async function fetchHealth() {
+            try {
+                const r = await fetch('/api/health');
+                const d = await r.json();
+                document.getElementById('uptime-val').innerText = d.uptime + "s / Availability: " + d.availability + "%";
+            } catch(e) {}
         }
-    })
+        fetchHealth();
+        setInterval(fetchHealth, 5000);
+    </script>
+</body>
+</html>
+"""
 
-# --  TOS Version -- 
+
+# --- Core Web Interface Endpoints ---
+@app.route("/")
+def home_redirect():
+    return redirect(url_for("admin_login"))
+
+
+@app.route("/api/Home", methods=["GET", "POST"])
+def admin_login():
+    if session.get("logged_in"):
+        return redirect(url_for("admin_dashboard"))
+
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASSWORD:
+            session["logged_in"] = True
+            return redirect(url_for("admin_dashboard"))
+        else:
+            error = "Invalid credential configuration."
+    return render_template_string(LOGIN_HTML, error=error)
+
+
+@app.route("/api/dashboard", methods=["GET"])
+@require_admin_session
+def admin_dashboard():
+    with get_db() as conn:
+        appointments = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
+    return render_template_string(DASHBOARD_HTML, appointments=[dict(r) for r in appointments])
+
+
+@app.route("/api/logout")
+def admin_logout():
+    session.clear()
+    return redirect(url_for("admin_login"))
+
+
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
     return jsonify({
@@ -182,15 +308,13 @@ def get_tos():
         "updated": True
     })
 
-# ---- SERVICES ----
 
 @app.route("/api/services", methods=["GET"])
 def get_services():
     return jsonify(SERVICES)
 
 
-# ---- PEOPLE ENDPOINTS ----
-
+# ---- CLIENT RECORDS ENDPOINTS ----
 @app.route("/api/records", methods=["GET"])
 def get_records():
     with get_db() as conn:
@@ -267,23 +391,18 @@ def delete_record(record_id):
     return jsonify({"message": "Record deleted"})
 
 
-# ---- GAME ENDPOINTS ----
-
+# ---- MINI GAME SYSTEM ENDPOINTS ----
 @app.route("/api/game-scores", methods=["GET"])
 def get_scores():
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM game_scores ORDER BY played_at DESC"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM game_scores ORDER BY played_at DESC").fetchall()
     return jsonify([dict(r) for r in rows])
 
 
 @app.route("/api/game-scores/<int:score_id>", methods=["GET"])
 def get_score(score_id):
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM game_scores WHERE id = ?", (score_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM game_scores WHERE id = ?", (score_id,)).fetchone()
     if row is None:
         return jsonify({"error": "Score not found"}), 404
     return jsonify(dict(row))
@@ -316,14 +435,11 @@ def submit_score():
 def leaderboard():
     limit = request.args.get("limit", 10, type=int)
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM game_scores ORDER BY score DESC LIMIT ?", (limit,)
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM game_scores ORDER BY score DESC LIMIT ?", (limit,)).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
-# ---- APPOINTMENT ENDPOINTS ----
-
+# ---- SECURE INTERNAL PUBLIC SQUARESAPCE ENDPOINTS ----
 @app.route("/api/appointments", methods=["GET"])
 @require_api_key
 def get_appointments():
@@ -334,9 +450,7 @@ def get_appointments():
                 "SELECT * FROM appointments WHERE status = ? ORDER BY date, time", (status,)
             ).fetchall()
         else:
-            rows = conn.execute(
-                "SELECT * FROM appointments ORDER BY date, time"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
     return jsonify([dict(r) for r in rows])
 
 
@@ -385,70 +499,6 @@ def create_appointment():
 
     return jsonify(dict(row)), 201
 
-# -- Online People counter -- #
-@app.route("/api/online", methods=["POST"])
-def heartbeat():
-    visitor_id = request.json.get("visitor_id")
-
-    if not visitor_id:
-        return jsonify({"error": "visitor_id required"}), 400
-
-    ONLINE_USERS[visitor_id] = time.time()
-
-    now = time.time()
-
-    expired = [
-        uid for uid, last_seen in ONLINE_USERS.items()
-        if now - last_seen > ONLINE_TIMEOUT
-    ]
-
-    for uid in expired:
-        del ONLINE_USERS[uid]
-
-    return jsonify({
-        "online": len(ONLINE_USERS)
-    })
-
-
-@app.route("/api/online", methods=["GET"])
-def get_online():
-    now = time.time()
-
-    expired = [
-        uid for uid, last_seen in ONLINE_USERS.items()
-        if now - last_seen > ONLINE_TIMEOUT
-    ]
-
-    for uid in expired:
-        del ONLINE_USERS[uid]
-
-    return jsonify({
-        "online": len(ONLINE_USERS)
-    })
-
- # --- Change here --- #
-def format_uptime(seconds):
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-
-    parts = []
-
-    if days:
-        parts.append(f"{days}d")
-
-    if hours:
-        parts.append(f"{hours}h")
-
-    if minutes:
-        parts.append(f"{minutes}m")
-
-    if secs or not parts:
-        parts.append(f"{secs}s")
-
-    return " ".join(parts)
-
 
 @app.route("/api/appointments/<int:appt_id>", methods=["PATCH"])
 @require_api_key
@@ -492,27 +542,54 @@ def delete_appointment(appt_id):
         conn.commit()
     return jsonify({"message": "Appointment deleted"})
 
-# -- Old helth check -- #
-# @app.route("/api/health", methods=["GET"])
-# def health():
-    # return jsonify({"status": "ok"})
 
-# --  New Health Check -- #
+# ---- HEARTBEAT TRACKING LOGIC ----
+@app.route("/api/online", methods=["POST"])
+def heartbeat():
+    visitor_id = request.json.get("visitor_id")
+    if not visitor_id:
+        return jsonify({"error": "visitor_id required"}), 400
+
+    ONLINE_USERS[visitor_id] = time.time()
+    now = time.time()
+    expired = [uid for uid, last_seen in ONLINE_USERS.items() if now - last_seen > ONLINE_TIMEOUT]
+    for uid in expired:
+        del ONLINE_USERS[uid]
+
+    return jsonify({"online": len(ONLINE_USERS)})
+
+
+@app.route("/api/online", methods=["GET"])
+def get_online():
+    now = time.time()
+    expired = [uid for uid, last_seen in ONLINE_USERS.items() if now - last_seen > ONLINE_TIMEOUT]
+    for uid in expired:
+        del ONLINE_USERS[uid]
+
+    return jsonify({"online": len(ONLINE_USERS)})
+
+
+def format_uptime(seconds):
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+
+    parts = []
+    if days: parts.append(f"{days}d")
+    if hours: parts.append(f"{hours}h")
+    if minutes: parts.append(f"{minutes}m")
+    if secs or not parts: parts.append(f"{secs}s")
+    return " ".join(parts)
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
-
     global LAST_INCIDENT
-
     start = time.perf_counter()
-
     uptime_seconds = int(time.time() - APP_START_TIME)
-
     status = "online"
-
-    latency = round(
-        (time.perf_counter() - start) * 1000,
-        2
-    )
+    latency = round((time.perf_counter() - start) * 1000, 2)
 
     if status != "online":
         LAST_INCIDENT = int(time.time())
@@ -523,21 +600,13 @@ def health():
         "uptime": uptime_seconds,
         "latency": latency
     }
-
     STATUS_HISTORY.append(entry)
 
     if len(STATUS_HISTORY) > MAX_HISTORY:
         STATUS_HISTORY.pop(0)
 
-    online_count = sum(
-        1 for h in STATUS_HISTORY
-        if h["status"] == "online"
-    )
-
-    availability = round(
-        (online_count / len(STATUS_HISTORY)) * 100,
-        2
-    ) if STATUS_HISTORY else 100
+    online_count = sum(1 for h in STATUS_HISTORY if h["status"] == "online")
+    availability = round((online_count / len(STATUS_HISTORY)) * 100, 2) if STATUS_HISTORY else 100
 
     return jsonify({
         "status": status,
@@ -556,7 +625,7 @@ def test_email():
     if not data or not data.get("email"):
         return jsonify({"error": "Provide an email in the body: {\"email\": \"you@email.com\"}"}), 400
     if not SMTP_PASS:
-        return jsonify({"error": "SMTP_PASS env var is not set in Render. Go to Environment tab and add it."}), 500
+        return jsonify({"error": "SMTP_PASS env var is not set in Render."}), 500
     try:
         test_data = {
             "email": data["email"],
@@ -569,12 +638,13 @@ def test_email():
         if result:
             return jsonify({"status": "Email sent successfully!", "to": data["email"]})
         else:
-            return jsonify({"error": "Email failed. Check Render logs for details. Make sure SMTP_USER and SMTP_PASS are set in Environment tab."}), 500
+            return jsonify({"error": "Email failed. Check logs."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 init_db()
+
 
 def _keep_alive():
     url = "https://api-1ilr.onrender.com/api/health"
@@ -584,6 +654,7 @@ def _keep_alive():
         except:
             pass
         time.sleep(600)
+
 
 threading.Thread(target=_keep_alive, daemon=True).start()
 
