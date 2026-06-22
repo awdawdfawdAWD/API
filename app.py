@@ -276,7 +276,12 @@ DASHBOARD_HTML = """
         body { background: var(--bg); color: #f5eff1; font-family: system-ui, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 25px; box-sizing: border-box; }
         .brand-block { display: flex; align-items: center; gap: 12px; font-weight: 700; color: #fff; font-size: 15px; }
-        .radar-dot { width: 10px; height: 10px; background: #00ffcc; border-radius: 50%; box-shadow: 0 0 10px #00ffcc; }
+        
+        /* Updated dynamic status colors for the radar-dot indicator */
+        .radar-dot { width: 10px; height: 10px; border-radius: 50%; transition: background 0.3s, box-shadow 0.3s; }
+        .radar-dot.online { background: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
+        .radar-dot.offline { background: #ff4a4a; box-shadow: 0 0 10px #ff4a4a; }
+
         .menu-list { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; flex: 1; }
         .nav-btn { display: flex; align-items: center; gap: 12px; background: transparent; border: 1px solid transparent; color: #9c8b90; width: 100%; padding: 12px 16px; border-radius: 8px; text-align: left; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .nav-btn.active { background: rgba(255, 107, 139, 0.08); border-color: rgba(255, 107, 139, 0.2); color: var(--neon); }
@@ -331,7 +336,10 @@ DASHBOARD_HTML = """
 
     <div class="sidebar">
         <div>
-            <div class="brand-block"><div class="radar-dot"></div>MANAGEMENT PLATFORM</div>
+            <div class="brand-block">
+                <div id="platform-status-dot" class="radar-dot {% if maintenance == 'true' %}offline{% else %}online{% endif %}"></div>
+                MANAGEMENT PLATFORM
+            </div>
             <div class="menu-list">
                 <button class="nav-btn active" onclick="navigatePanel(this, 'appointments')">📋 Appointments Stream</button>
                 <button class="nav-btn" onclick="navigatePanel(this, 'diagnostics')">🛰️ Health & Diagnostics</button>
@@ -493,6 +501,14 @@ DASHBOARD_HTML = """
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ maintenance: chk.checked ? 'true' : 'false' })
                 });
+                
+                // Instantly sync the visual dot class on manual structural toggling
+                const dot = document.getElementById('platform-status-dot');
+                if(chk.checked) {
+                    dot.className = "radar-dot offline";
+                } else {
+                    dot.className = "radar-dot online";
+                }
             } catch(e) { alert("Failed to switch maintenance mode configurations."); }
         }
 
@@ -646,6 +662,14 @@ DASHBOARD_HTML = """
                 const metrics = await response.json();
                 document.getElementById('nav-avail-val').innerText = metrics.availability + "%";
                 document.getElementById('nav-lat-val').innerText = metrics.latency + "ms";
+                
+                // Dynamically updates the sidebar indicator dot color based on application live state
+                const dot = document.getElementById('platform-status-dot');
+                if (metrics.status === 'maintenance') {
+                    dot.className = "radar-dot offline";
+                } else {
+                    dot.className = "radar-dot online";
+                }
                 
                 const userRes = await fetch('/api/online');
                 const userData = await userRes.json();
@@ -1024,6 +1048,5 @@ def _keep_alive():
 threading.Thread(target=_keep_alive, daemon=True).start()
 
 if __name__ == "__main__":
-    # Fixed: Read port dynamically from Render's Assigned Environment variables
     port_val = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port_val)
