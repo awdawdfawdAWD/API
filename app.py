@@ -635,11 +635,11 @@ DASHBOARD_HTML = """
             const target = document.getElementById('leaderboard-body-rows');
             try {
                 const r = await fetch('/api/leaderboard?limit=10');
-                const data = await r.json();
+                const data = await r.json();rcade Leaderboard Registe
                 if(data.length === 0) {
                     target.innerHTML = `<tr><td colspan="4" style="color:#8f8084; text-align:center;">No high scores mapped yet.</td></tr>`;
                     return;
-                }
+                }rcade Leaderboard Registe
                 let html = '';
                 data.forEach(row => {
                     html += `<tr>
@@ -686,7 +686,7 @@ def admin_login():
     error = None
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
-            session["logged_in"] = True
+            session["logged_in"] = Truercade Leaderboard Registe
             return redirect(url_for("admin_dashboard"))
         else:
             error = "Invalid credential configuration."
@@ -767,7 +767,7 @@ def get_internal_appointments():
 
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
-    return jsonify({"version": "2.0", "title": "Terms of Service", "effectiveDate": "2026-06-15", "updated": True})
+    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-15", "updated": True})
 
 
 @app.route("/api/services", methods=["GET"])
