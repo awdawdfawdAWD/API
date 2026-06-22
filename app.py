@@ -796,10 +796,12 @@ def health():
     global LAST_INCIDENT
     start = time.perf_counter()
     uptime_seconds = int(time.time() - APP_START_TIME)
-    status = "online"
+    
+    # Structural Adjustment: If maintenance mode is toggled, broadcast status accurately
+    status = "maintenance" if MAINTENANCE_MODE else "online"
     latency = round((time.perf_counter() - start) * 1000, 2)
 
-    if status != "online":
+    if status == "offline":
         LAST_INCIDENT = int(time.time())
 
     entry = {
@@ -813,7 +815,7 @@ def health():
     if len(STATUS_HISTORY) > MAX_HISTORY:
         STATUS_HISTORY.pop(0)
 
-    online_count = sum(1 for h in STATUS_HISTORY if h["status"] == "online")
+    online_count = sum(1 for h in STATUS_HISTORY if h["status"] == "online" or h["status"] == "maintenance")
     availability = round((online_count / len(STATUS_HISTORY)) * 100, 2) if STATUS_HISTORY else 100
 
     return jsonify({
@@ -850,7 +852,6 @@ def test_email():
 
 # ---- SQUARESAPCE AUTOMATED PRICE STREAM ENGINE ----
 def sync_squarespace_prices():
-    """Background loop checking and updating localized cached pricing from Squarespace every 2 minutes."""
     if not SQUARESPACE_API_KEY:
         print("[Squarespace Sync Warning] SQUARESPACE_API_KEY environment configuration is missing.")
         return
@@ -889,10 +890,7 @@ def sync_squarespace_prices():
         time.sleep(120)
 
 
-# Initialize Database Context 
 init_db()
-
-# Spawn Asynchronous Daemon Tracking Threads
 threading.Thread(target=sync_squarespace_prices, daemon=True).start()
 
 def _keep_alive():
