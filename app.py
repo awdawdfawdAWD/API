@@ -19,8 +19,11 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placehold
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
-# Pull Squarespace API key securely from environment (Set this up in Render)
+# Pull Squarespace API key securely from environment
 SQUARESPACE_API_KEY = os.environ.get("SQUARESPACE_API_KEY", "")
+
+# Global System Maintenance Flag
+MAINTENANCE_MODE = False
 
 # Enforced cross-origin script authorization 
 CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
@@ -161,10 +164,7 @@ LOGIN_HTML = """
     <style>
         :root { --neon: #ff6b8b; --dark: #000000; --panel: rgba(20, 15, 17, 0.85); }
         body { background: var(--dark); color: #fdfafb; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; position: relative; }
-        
-        /* Canvas layer for the glowing fire ember particles */
         #emberCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-
         .login-card { position: relative; z-index: 2; background: var(--panel); border: 1px solid rgba(255,107,139,0.25); border-radius: 16px; padding: 40px; width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(255, 107, 139, 0.1); backdrop-filter: blur(8px); opacity: 0; transform: translateY(15px); animation: enter 0.5s ease-out forwards; }
         h2 { text-transform: uppercase; letter-spacing: 2px; color: var(--neon); margin: 0 0 8px; text-align: center; font-size: 20px; text-shadow: 0 0 10px rgba(255, 107, 139, 0.4); }
         .sub { color: #a39296; text-align: center; font-size: 13px; margin-bottom: 30px; }
@@ -180,7 +180,6 @@ LOGIN_HTML = """
 </head>
 <body>
     <canvas id="emberCanvas"></canvas>
-
     <div class="login-card">
         <h2>System Access</h2>
         <div class="sub">Provide structural decryption passkey</div>
@@ -190,73 +189,35 @@ LOGIN_HTML = """
             <button type="submit">INITIALIZE CONTROL MATRIX</button>
         </form>
     </div>
-
     <script>
         const canvas = document.getElementById('emberCanvas');
         const ctx = canvas.getContext('2d');
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        const particles = [];
-        const particleCount = 65;
-
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
+        const particles = []; const particleCount = 65;
         class Ember {
-            constructor() {
-                this.reset();
-                this.y = Math.random() * canvas.height; // randomize initialization heights
-            }
+            constructor() { this.reset(); this.y = Math.random() * canvas.height; }
             reset() {
-                this.x = Math.random() * canvas.width;
-                this.y = canvas.height + Math.random() * 20;
-                this.size = Math.random() * 3 + 1;
-                this.speedY = Math.random() * 1.2 + 0.5;
-                this.speedX = Math.random() * 0.6 - 0.3;
-                // Vary between fiery bright orange, deep gold, and amber-red tones
+                this.x = Math.random() * canvas.width; this.y = canvas.height + Math.random() * 20;
+                this.size = Math.random() * 3 + 1; this.speedY = Math.random() * 1.2 + 0.5; this.speedX = Math.random() * 0.6 - 0.3;
                 const colors = ['rgba(255, 69, 0, ', 'rgba(255, 140, 0, ', 'rgba(255, 107, 139, ', 'rgba(218, 165, 32, '];
-                this.colorBase = colors[Math.floor(Math.random() * colors.length)];
-                this.alpha = Math.random() * 0.5 + 0.4;
-                this.fadeSpeed = Math.random() * 0.005 + 0.002;
-                this.wobble = Math.random() * 2;
-                this.wobbleSpeed = Math.random() * 0.02;
+                this.colorBase = colors[Math.floor(Math.random() * colors.length)]; this.alpha = Math.random() * 0.5 + 0.4;
+                this.fadeSpeed = Math.random() * 0.005 + 0.002; this.wobble = Math.random() * 2; this.wobbleSpeed = Math.random() * 0.02;
             }
             update() {
-                this.y -= this.speedY;
-                this.x += this.speedX + Math.sin(this.wobble) * 0.2;
-                this.wobble += this.wobbleSpeed;
-                this.alpha -= this.fadeSpeed;
-
-                if (this.y < -10 || this.alpha <= 0 || this.x < 0 || this.x > canvas.width) {
-                    this.reset();
-                }
+                this.y -= this.speedY; this.x += this.speedX + Math.sin(this.wobble) * 0.2;
+                this.wobble += this.wobbleSpeed; this.alpha -= this.fadeSpeed;
+                if (this.y < -10 || this.alpha <= 0 || this.x < 0 || this.x > canvas.width) { this.reset(); }
             }
             draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = this.colorBase + this.alpha + ')';
-                ctx.shadowBlur = this.size * 3;
-                ctx.shadowColor = '#ff4500';
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.colorBase + this.alpha + ')'; ctx.shadowBlur = this.size * 3; ctx.shadowColor = '#ff4500'; ctx.fill();
             }
         }
-
-        for (let i = 0; i < particleCount; i++) {
-            particles.push(new Ember());
-        }
-
+        for (let i = 0; i < particleCount; i++) { particles.push(new Ember()); }
         function animate() {
-            ctx.shadowBlur = 0; // Clear shadow properties before clearing background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // Trail effect over the pure black background
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].update();
-                particles[i].draw();
-            }
+            ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.length; i++) { particles[i].update(); particles[i].draw(); }
             requestAnimationFrame(animate);
         }
         animate();
@@ -275,7 +236,6 @@ DASHBOARD_HTML = """
         :root { --neon: #ff6b8b; --neon-cyan: #00f0ff; --bg: #070506; --sidebar: #0f0a0c; --panel: #161012; --border: rgba(255, 107, 139, 0.12); }
         body { background: var(--bg); color: #f5eff1; font-family: system-ui, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* Persistent Left Control Column */
         .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 25px; box-sizing: border-box; }
         .brand-block { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: 1px; color: #fff; font-size: 15px; }
         .radar-dot { width: 10px; height: 10px; background: #00ffcc; border-radius: 50%; box-shadow: 0 0 10px #00ffcc; animation: pulse 2s infinite; }
@@ -287,7 +247,6 @@ DASHBOARD_HTML = """
         .logout-btn { border: 1px solid rgba(255,74,74,0.3); color: #ff4a4a; text-decoration: none; text-align: center; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: background 0.2s; }
         .logout-btn:hover { background: #ff4a4a; color: #fff; }
 
-        /* Main Workspace Frame */
         .main-frame { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         .top-stat-bar { background: var(--sidebar); border-bottom: 1px solid var(--border); padding: 15px 35px; display: flex; gap: 40px; align-items: center; }
         .mini-metric { font-size: 12px; color: #8f8084; text-transform: uppercase; font-weight: 600; }
@@ -301,22 +260,23 @@ DASHBOARD_HTML = """
         .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 25px rgba(0,0,0,0.3); }
         .panel h3 { margin: 0 0 20px; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
         
-        /* Queue Data Cards */
         .record-card { background: #1d1618; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid var(--neon); display: flex; justify-content: space-between; align-items: center; }
         .record-card .name { font-weight: 600; color: #fff; font-size: 15px; }
         .record-card .details { font-size: 13px; color: #9c8b90; margin-top: 3px; }
         .status-pill { background: rgba(255, 107, 139, 0.1); color: var(--neon); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 
-        /* Tech Diagnostic Rows */
         .info-row { display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 14px; }
         .info-row:last-child { border: none; }
         .info-row label { color: #8f8084; }
         .info-row value { font-weight: 600; color: #fff; }
 
-        /* Quick-Action Controls */
         .btn-action { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; text-align: center; display: block; text-decoration: none; }
         .btn-action:hover { background: var(--neon); color: #fff; }
         
+        .btn-maint { background: #e74c3c; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 13px; transition: opacity 0.2s; letter-spacing: 0.5px; }
+        .btn-maint.maint-active { background: #2ecc71; }
+        .btn-maint:hover { opacity: 0.9; }
+
         .json-output { background: #0d090a; color: #00ffcc; font-family: monospace; padding: 15px; border-radius: 6px; font-size: 12px; overflow-x: auto; max-height: 300px; white-space: pre-wrap; margin-top: 15px; border: 1px solid rgba(0,255,204,0.1); }
 
         @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; box-shadow: 0 0 12px #00ffcc; } }
@@ -345,6 +305,7 @@ DASHBOARD_HTML = """
             <div class="mini-metric">Engine Pipeline <span>SQLite3 Core</span></div>
             <div class="mini-metric">Live Availability <span id="nav-avail-val">100%</span></div>
             <div class="mini-metric">Server Latency <span id="nav-lat-val">0.00ms</span></div>
+            <div class="mini-metric">API Mode <span id="nav-maint-val" style="font-weight:bold;">LIVE</span></div>
         </div>
 
         <div class="content-container">
@@ -371,6 +332,10 @@ DASHBOARD_HTML = """
                         {% endif %}
                     </div>
                     <div class="panel">
+                        <h3>Operations & Maintenance</h3>
+                        <button id="maintBtn" class="btn-maint" onclick="toggleMaintenance()">🚨 TRIGGER API MAINTENANCE MODE</button>
+                        <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+                        
                         <h3>View Internal Application Schemas</h3>
                         <button class="btn-action" onclick="fetchInternalData('/api/internal/appointments', 'appointments-json')">Load Appointments Matrix</button>
                         <button class="btn-action" onclick="fetchInternalData('/api/services', 'appointments-json')">Inspect Active Services</button>
@@ -439,18 +404,43 @@ DASHBOARD_HTML = """
             }
         }
 
+        async function toggleMaintenance() {
+            try {
+                const r = await fetch('/api/admin/toggle-maintenance', { method: 'POST' });
+                const d = await r.json();
+                updateMaintUI(d.maintenance_mode);
+            } catch (err) {
+                alert("Failed to toggle maintenance status.");
+            }
+        }
+
+        function updateMaintUI(isMaint) {
+            const btn = document.getElementById('maintBtn');
+            const topIndicator = document.getElementById('nav-maint-val');
+            if (isMaint) {
+                btn.innerText = "🟢 RESTORE LIVE API CHANNELS";
+                btn.classList.add('maint-active');
+                topIndicator.innerText = "MAINTENANCE";
+                topIndicator.style.color = "#e74c3c";
+            } else {
+                btn.innerText = "🚨 TRIGGER API MAINTENANCE MODE";
+                btn.classList.remove('maint-active');
+                topIndicator.innerText = "LIVE";
+                topIndicator.style.color = "#2ecc71";
+            }
+        }
+
         async function syncTelemetry() {
             try {
                 const response = await fetch('/api/health');
                 const metrics = await response.json();
                 
-                // Top Global Summary Bar Sync
                 document.getElementById('nav-avail-val').innerText = metrics.availability + "%";
                 document.getElementById('nav-lat-val').innerText = metrics.latency + "ms";
-                
-                // Diagnostics Panel Viewports Sync
                 document.getElementById('diag-latency').innerText = metrics.latency + " ms";
                 document.getElementById('diag-uptime').innerText = metrics.uptime + " seconds";
+                
+                updateMaintUI(metrics.maintenance_mode);
             } catch (err) {
                 console.error("Telemetry pipeline connection failed:", err);
             }
@@ -499,7 +489,15 @@ def admin_logout():
     return redirect(url_for("admin_login"))
 
 
-# --- Secure Internal Admin Bridge to prevent browser Authorization Errors ---
+@app.route("/api/admin/toggle-maintenance", methods=["POST"])
+@require_admin_session
+def toggle_maintenance_mode():
+    global MAINTENANCE_MODE
+    MAINTENANCE_MODE = not MAINTENANCE_MODE
+    return jsonify({"status": "success", "maintenance_mode": MAINTENANCE_MODE})
+
+
+# --- Secure Internal Admin Bridge ---
 @app.route("/api/internal/appointments", methods=["GET"])
 @require_admin_session
 def get_internal_appointments():
@@ -520,6 +518,8 @@ def get_tos():
 
 @app.route("/api/services", methods=["GET"])
 def get_services():
+    if MAINTENANCE_MODE:
+        return jsonify({"error": "Service Unavailable under structural system maintenance window."}), 503
     return jsonify(SERVICES)
 
 
@@ -652,6 +652,8 @@ def leaderboard():
 @app.route("/api/appointments", methods=["GET"])
 @require_api_key
 def get_appointments():
+    if MAINTENANCE_MODE:
+        return jsonify({"error": "Service Temporarily Unavailable"}), 503
     status = request.args.get("status")
     with get_db() as conn:
         if status:
@@ -666,6 +668,8 @@ def get_appointments():
 @app.route("/api/appointments/<int:appt_id>", methods=["GET"])
 @require_api_key
 def get_appointment(appt_id):
+    if MAINTENANCE_MODE:
+        return jsonify({"error": "Service Temporarily Unavailable"}), 503
     with get_db() as conn:
         row = conn.execute("SELECT * FROM appointments WHERE id = ?", (appt_id,)).fetchone()
     if row is None:
@@ -676,6 +680,9 @@ def get_appointment(appt_id):
 @app.route("/api/appointments", methods=["POST"])
 @require_api_key
 def create_appointment():
+    if MAINTENANCE_MODE:
+        return jsonify({"error": "Service Temporarily Unavailable (Maintenance Triggered)"}), 503
+
     data = request.get_json()
     required = ["name", "message_type", "date", "time"]
     missing = [f for f in required if not data or not data.get(f, "").strip()]
@@ -703,7 +710,6 @@ def create_appointment():
         conn.commit()
         row = conn.execute("SELECT * FROM appointments WHERE id = ?", (cur.lastrowid,)).fetchone()
 
-    # Pass an isolated, explicit dictionary to prevent multi-thread connection cross-pollution
     data_with_price = dict(row)
     threading.Thread(target=send_confirmation_email, args=(data_with_price,), daemon=True).start()
 
@@ -713,6 +719,8 @@ def create_appointment():
 @app.route("/api/appointments/<int:appt_id>", methods=["PATCH"])
 @require_api_key
 def update_appointment(appt_id):
+    if MAINTENANCE_MODE:
+        return jsonify({"error": "Service Temporarily Unavailable"}), 503
     data = request.get_json()
     with get_db() as conn:
         existing = conn.execute("SELECT * FROM appointments WHERE id = ?", (appt_id,)).fetchone()
@@ -727,7 +735,6 @@ def update_appointment(appt_id):
         if "name" in data:
             conn.execute("UPDATE appointments SET name = ? WHERE id = ?", (data["name"], appt_id))
         if "message_type" in data:
-            # Re-calculate correct price upon service modifications
             svc = SERVICES.get(data["message_type"], {})
             price = svc.get("price", 0)
             conn.execute("UPDATE appointments SET message_type = ?, price = ? WHERE id = ?", (data["message_type"], price, appt_id))
@@ -747,6 +754,8 @@ def update_appointment(appt_id):
 @app.route("/api/appointments/<int:appt_id>", methods=["DELETE"])
 @require_api_key
 def delete_appointment(appt_id):
+    if MAINTENANCE_MODE:
+        return jsonify({"error": "Service Temporarily Unavailable"}), 503
     with get_db() as conn:
         existing = conn.execute("SELECT * FROM appointments WHERE id = ?", (appt_id,)).fetchone()
         if existing is None:
@@ -782,20 +791,6 @@ def get_online():
     return jsonify({"online": len(ONLINE_USERS)})
 
 
-def format_uptime(seconds):
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-
-    parts = []
-    if days: parts.append(f"{days}d")
-    if hours: parts.append(f"{hours}h")
-    if minutes: parts.append(f"{minutes}m")
-    if secs or not parts: parts.append(f"{secs}s")
-    return " ".join(parts)
-
-
 @app.route("/api/health", methods=["GET"])
 def health():
     global LAST_INCIDENT
@@ -827,7 +822,8 @@ def health():
         "latency": latency,
         "availability": availability,
         "lastIncident": LAST_INCIDENT,
-        "history": STATUS_HISTORY
+        "history": STATUS_HISTORY,
+        "maintenance_mode": MAINTENANCE_MODE
     })
 
 
@@ -836,9 +832,7 @@ def health():
 def test_email():
     data = request.get_json()
     if not data or not data.get("email"):
-        return jsonify({"error": "Provide an email in the body: {\"email\": \"you@email.com\"}"}), 400
-    if not SMTP_PASS:
-        return jsonify({"error": "SMTP_PASS env var is not set in Render."}), 500
+        return jsonify({"error": "Provide an email in the body"}), 400
     try:
         test_data = {
             "email": data["email"],
@@ -847,17 +841,14 @@ def test_email():
             "date": "2026-06-15",
             "time": "10:00",
         }
-        result = send_confirmation_email(test_data)
-        if result:
+        if send_confirmation_email(test_data):
             return jsonify({"status": "Email sent successfully!", "to": data["email"]})
-        else:
-            return jsonify({"error": "Email failed. Check logs."}), 500
+        return jsonify({"error": "Email failed. Check logs."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ---- SQUARESAPCE AUTOMATED PRICE STREAM ENGINE ----
-
 def sync_squarespace_prices():
     """Background loop checking and updating localized cached pricing from Squarespace every 2 minutes."""
     if not SQUARESPACE_API_KEY:
@@ -881,13 +872,11 @@ def sync_squarespace_prices():
                         prod_name = prod.get("name")
                         variants = prod.get("variants", [])
                         
-                        # Match Squarespace item names dynamically with localized dictionary keys
                         if prod_name in SERVICES and variants:
                             price_data = variants[0].get("price", {})
                             if isinstance(price_data, dict) and "value" in price_data:
                                 try:
                                     live_price = float(price_data["value"])
-                                    # Override cache instantly upon discrepancy discoverability
                                     if SERVICES[prod_name]["price"] != live_price:
                                         print(f"[Sync Activity] Altered cost variant for '{prod_name}': ${live_price}")
                                         SERVICES[prod_name]["price"] = live_price
@@ -897,7 +886,6 @@ def sync_squarespace_prices():
         except Exception as e:
             print(f"[Sync Exception Raised] Squarespace validation failure: {e}")
             
-        # Strict validation loop interval check execution context window constraints (120 seconds = 2 minutes)
         time.sleep(120)
 
 
@@ -915,7 +903,6 @@ def _keep_alive():
         except:
             pass
         time.sleep(600)
-
 
 threading.Thread(target=_keep_alive, daemon=True).start()
 
