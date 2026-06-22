@@ -38,11 +38,6 @@ SERVICES = {
     "Hot-stone Massage": {"duration": "60 min", "price": 150},
 }
 
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USER = os.environ.get("SMTP_USER", "bels_massage@belsmagichandsmassage.com")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -91,14 +86,48 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Persistent config mapping (Safe for Render Free Tier spin-downs)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS config_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        
+        # Base setup defaults
+        defaults = [
+            ("smtp_host", os.environ.get("SMTP_HOST", "smtp.gmail.com")),
+            ("smtp_port", os.environ.get("SMTP_PORT", "587")),
+            ("smtp_user", os.environ.get("SMTP_USER", "bels_massage@belsmagichandsmassage.com")),
+            ("smtp_pass", os.environ.get("SMTP_PASS", "")),
+            ("maintenance_mode", "false")
+        ]
+        for key, val in defaults:
+            conn.execute("INSERT OR IGNORE INTO config_settings (key, value) VALUES (?, ?)", (key, val))
+            
         try:
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-    print("Database connection structural mappings validated.")
+    print("Database framework structure maps validated.")
 
 
-# --- Session Control Utilities ---
+def get_config_val(key, default=""):
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM config_settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def get_smtp_config():
+    config = {}
+    with get_db() as conn:
+        rows = conn.execute("SELECT key, value FROM config_settings WHERE key LIKE 'smtp_%'").fetchall()
+        for r in rows:
+            config[r["key"]] = r["value"]
+    return config
+
+
+# --- Session Security Modifiers ---
 def require_admin_session(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -118,7 +147,8 @@ def require_api_key(f):
 
 
 def send_confirmation_email(data):
-    if not data.get("email") or not SMTP_PASS:
+    cfg = get_smtp_config()
+    if not data.get("email") or not cfg.get("smtp_pass"):
         return False
     try:
         html = f"""
@@ -130,21 +160,22 @@ def send_confirmation_email(data):
         """
         msg = MIMEMultipart("alternative")
         msg["Subject"] = "Appointment Confirmed"
-        msg["From"] = f"Bel's Magic Hands <{SMTP_USER}>"
+        msg["From"] = f"Bel's Magic Hands <{cfg['smtp_user']}>"
         msg["To"] = data["email"]
         msg.attach(MIMEText(html, "html"))
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+        with smtplib.SMTP(cfg["smtp_host"], int(cfg["smtp_port"]), timeout=15) as server:
             server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_USER, data["email"], msg.as_string())
+            server.login(cfg["smtp_user"], cfg["smtp_pass"])
+            server.sendmail(cfg["smtp_user"], data["email"], msg.as_string())
         return True
     except:
         return False
 
 
 def send_invoice_email_worker(appt):
-    if not appt.get("email") or not SMTP_PASS:
+    cfg = get_smtp_config()
+    if not appt.get("email") or not cfg.get("smtp_pass"):
         return False
     try:
         price = appt.get("price", 0)
@@ -176,21 +207,21 @@ def send_invoice_email_worker(appt):
         """
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"Invoice from Bel's Magic Hands — {appt['name']}"
-        msg["From"] = f"Bel's Magic Hands <{SMTP_USER}>"
+        msg["From"] = f"Bel's Magic Hands <{cfg['smtp_user']}>"
         msg["To"] = appt["email"]
         msg.attach(MIMEText(html, "html"))
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+        with smtplib.SMTP(cfg["smtp_host"], int(cfg["smtp_port"]), timeout=15) as server:
             server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_USER, appt["email"], msg.as_string())
+            server.login(cfg["smtp_user"], cfg["smtp_pass"])
+            server.sendmail(cfg["smtp_user"], appt["email"], msg.as_string())
         return True
     except Exception as e:
-        print(f"Invoice submission runtime failure: {str(e)}")
+        print(f"Invoice execution worker fail: {str(e)}")
         return False
 
 
-# --- Premium Business Cyberpunk UI with Fire Ember Background Engine ---
+# --- Cyberpunk Admin Dashboard Assembly Framework ---
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -278,7 +309,15 @@ DASHBOARD_HTML = """
         .btn-invoice:hover { background: var(--neon-cyan); color: #000; }
         .json-output { background: #0d090a; color: #00ffcc; font-family: monospace; padding: 15px; border-radius: 6px; font-size: 12px; overflow-x: auto; max-height: 300px; white-space: pre-wrap; margin-top: 15px; border: 1px solid rgba(0,255,204,0.1); }
         
-        /* Modal Layering Layout styling */
+        /* Toggle Styling for Maintenance Overrides */
+        .switch-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #332225; transition: .3s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: #8f8084; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--neon); }
+        input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
+
         .modal-bg { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:10000; }
         .modal-box { background:var(--panel); border:1px solid var(--neon); padding:30px; border-radius:12px; width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.8); }
         .modal-box h4 { color:var(--neon); margin:0 0 20px; text-transform:uppercase; font-size:16px; }
@@ -299,6 +338,7 @@ DASHBOARD_HTML = """
                 <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Secondary Database Records</button>
             </div>
         </div>
+        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP SETTINGS</button>
         <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
     </div>
 
@@ -334,7 +374,16 @@ DASHBOARD_HTML = """
                         {% endif %}
                     </div>
                     <div class="panel">
-                        <h3>View Internal Application Schemas</h3>
+                        <h3>System Directives</h3>
+                        <div class="switch-wrap">
+                            <span style="font-size:13px; font-weight:600; color:#fff;">🛠️ MAINTENANCE MODE</span>
+                            <label class="switch">
+                                <input type="checkbox" id="maintToggle" onchange="toggleMaintenance(this)" {% if maintenance == 'true' %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <h3>View Internal Schemas</h3>
                         <button class="btn-action" onclick="fetchInternalData('/api/internal/appointments', 'appointments-json')">Load Appointments Matrix</button>
                         <button class="btn-action" onclick="fetchInternalData('/api/services', 'appointments-json')">Inspect Active Services</button>
                         <div id="appointments-json" class="json-output" style="display:none;"></div>
@@ -375,22 +424,37 @@ DASHBOARD_HTML = """
             <form id="clientForm" onsubmit="submitClientForm(event)">
                 <label>Full Name *</label>
                 <input type="text" id="m_name" required>
-                
                 <label>Date of Birth</label>
                 <input type="text" id="m_dob" placeholder="YYYY-MM-DD">
-                
                 <label>Phone Number</label>
                 <input type="text" id="m_phone">
-                
                 <label>Address</label>
                 <input type="text" id="m_address">
-                
                 <label>Clinical Massage Notes</label>
-                <textarea id="m_notes" rows="3" placeholder="Injuries, preferences, pressure adjustments..."></textarea>
-                
+                <textarea id="m_notes" rows="3" placeholder="Injuries, preferences..."></textarea>
                 <div class="modal-flex">
                     <button type="submit" style="background:var(--neon); color:#fff; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">SAVE ENTRY</button>
                     <button type="button" onclick="closeClientModal()" style="background:#4a3a3d; color:#fff; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">CANCEL</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="smtpModal">
+        <div class="modal-box">
+            <h4>SMTP Relaying Configurations</h4>
+            <form id="smtpForm" onsubmit="submitSmtpForm(event)">
+                <label>SMTP Relay Host</label>
+                <input type="text" id="s_host" required>
+                <label>Port</label>
+                <input type="text" id="s_port" required>
+                <label>Sender Username/Email Address</label>
+                <input type="email" id="s_user" required>
+                <label>Relay Password / App Key</label>
+                <input type="password" id="s_pass" placeholder="••••••••••••">
+                <div class="modal-flex">
+                    <button type="submit" style="background:var(--neon-cyan); color:#000; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">UPDATE SETTINGS</button>
+                    <button type="button" onclick="closeSmtpModal()" style="background:#4a3a3d; color:#fff; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">CANCEL</button>
                 </div>
             </form>
         </div>
@@ -403,6 +467,16 @@ DASHBOARD_HTML = """
             btn.classList.add('active');
             document.getElementById('pane-' + paneId).classList.add('active');
             if(paneId === 'records') { loadClientList(); }
+        }
+
+        async function toggleMaintenance(chk) {
+            try {
+                await fetch('/api/internal/maintenance', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ maintenance: chk.checked ? 'true' : 'false' })
+                });
+            } catch(e) { alert("Failed to switch execution modes."); }
         }
 
         async function fetchInternalData(endpoint, outputId) {
@@ -427,6 +501,38 @@ DASHBOARD_HTML = """
 
         function openClientModal() { document.getElementById('clientModal').style.display = 'flex'; }
         function closeClientModal() { document.getElementById('clientModal').style.display = 'none'; document.getElementById('clientForm').reset(); }
+
+        async function openSmtpModal() {
+            try {
+                const r = await fetch('/api/internal/smtp');
+                const cfg = await r.json();
+                document.getElementById('s_host').value = cfg.smtp_host || '';
+                document.getElementById('s_port').value = cfg.smtp_port || '';
+                document.getElementById('s_user').value = cfg.smtp_user || '';
+                document.getElementById('s_pass').value = ''; 
+                document.getElementById('smtpModal').style.display = 'flex';
+            } catch(e) { alert("Could not fetch configurations."); }
+        }
+        function closeSmtpModal() { document.getElementById('smtpModal').style.display = 'none'; }
+
+        async function submitSmtpForm(e) {
+            e.preventDefault();
+            const payload = {
+                smtp_host: document.getElementById('s_host').value,
+                smtp_port: document.getElementById('s_port').value,
+                smtp_user: document.getElementById('s_user').value,
+                smtp_pass: document.getElementById('s_pass').value
+            };
+            try {
+                const r = await fetch('/api/internal/smtp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if(r.ok) { alert("SMTP Configurations successfully updated."); closeSmtpModal(); }
+                else { alert("Failed to commit settings updates."); }
+            } catch(err) { alert("Network payload failure."); }
+        }
 
         async function submitClientForm(e) {
             e.preventDefault();
@@ -511,15 +617,48 @@ def admin_login():
 @app.route("/api/dashboard", methods=["GET"])
 @require_admin_session
 def admin_dashboard():
+    m_mode = get_config_val("maintenance_mode", "false")
     with get_db() as conn:
         appointments = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
-    return render_template_string(DASHBOARD_HTML, appointments=[dict(r) for r in appointments])
+    return render_template_string(DASHBOARD_HTML, appointments=[dict(r) for r in appointments], maintenance=m_mode)
 
 
 @app.route("/api/logout")
 def admin_logout():
     session.clear()
     return redirect(url_for("admin_login"))
+
+
+# --- Dynamic Persistent Configurations Endpoints ---
+@app.route("/api/internal/smtp", methods=["GET"])
+@require_admin_session
+def get_smtp_settings():
+    return jsonify(get_smtp_config())
+
+
+@app.route("/api/internal/smtp", methods=["POST"])
+@require_admin_session
+def save_smtp_settings():
+    data = request.get_json() or {}
+    with get_db() as conn:
+        for key in ["smtp_host", "smtp_port", "smtp_user"]:
+            if key in data:
+                conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES (?, ?)", (key, str(data[key])))
+        if data.get("smtp_pass"):
+            conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES (?, ?)", ("smtp_pass", str(data["smtp_pass"])))
+        conn.commit()
+    return jsonify({"status": "success"})
+
+
+@app.route("/api/internal/maintenance", methods=["POST"])
+@require_admin_session
+def save_maintenance_settings():
+    data = request.get_json() or {}
+    mode = data.get("maintenance", "false")
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', ?)", (mode,))
+        conn.commit()
+    return jsonify({"status": "success"})
 
 
 # --- Secure Internal Invoice API Endpoint ---
@@ -529,14 +668,14 @@ def trigger_appointment_invoice(appt_id):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM appointments WHERE id = ?", (appt_id,)).fetchone()
     if row is None:
-        return jsonify({"error": "Appointment configuration model unmapped"}), 404
+        return jsonify({"error": "Appointment unmapped"}), 404
     
     appt_data = dict(row)
     if not appt_data.get("email"):
-        return jsonify({"error": "Selected system appointment contains no valid client destination email address"}), 400
+        return jsonify({"error": "Selected appointment contains no client destination email"}), 400
         
     threading.Thread(target=send_invoice_email_worker, args=(appt_data,), daemon=True).start()
-    return jsonify({"status": "success", "msg": "Invoice passed down processing execution stream."})
+    return jsonify({"status": "success", "msg": "Invoice dispatched down execution pipeline stream."})
 
 
 @app.route("/api/internal/appointments", methods=["GET"])
@@ -616,14 +755,25 @@ def create_appointment():
 @app.route("/api/health", methods=["GET"])
 def health():
     start = time.perf_counter()
+    m_mode = get_config_val("maintenance_mode", "false")
+    status_str = "maintenance" if m_mode == "true" else "online"
+    avail_val = 0 if m_mode == "true" else 100
+    
     uptime_seconds = int(time.time() - APP_START_TIME)
     latency = round((time.perf_counter() - start) * 1000, 2)
-    entry = {"time": int(time.time()), "status": "online", "uptime": uptime_seconds, "latency": latency}
+    
+    entry = {"time": int(time.time()), "status": status_str, "uptime": uptime_seconds, "latency": latency}
     STATUS_HISTORY.append(entry)
     if len(STATUS_HISTORY) > MAX_HISTORY:
         STATUS_HISTORY.pop(0)
 
-    return jsonify({"status": "online", "uptime": uptime_seconds, "latency": latency, "availability": 100, "history": STATUS_HISTORY})
+    return jsonify({
+        "status": status_str, 
+        "uptime": uptime_seconds, 
+        "latency": latency, 
+        "availability": avail_val, 
+        "history": STATUS_HISTORY
+    })
 
 
 init_db()
