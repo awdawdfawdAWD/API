@@ -14,7 +14,7 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Security parameters pulled from Render Environment variables
+# Security layer parameters pulled from Render Environment variables
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placeholder")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
@@ -108,7 +108,7 @@ def init_db():
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-    print("Core framework database structure completely initialized.")
+    print("Database connection structural mappings validated.")
 
 
 def get_config_val(key, default=""):
@@ -126,7 +126,7 @@ def get_smtp_config():
     return config
 
 
-# --- Authentication Modifiers ---
+# --- Session Control Utilities ---
 def require_admin_session(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -216,20 +216,7 @@ def send_invoice_email_worker(appt):
         return False
 
 
-def format_uptime(seconds):
-    days = seconds // 86400
-    hours = (seconds % 86400) // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    parts = []
-    if days: parts.append(f"{days}d")
-    if hours: parts.append(f"{hours}h")
-    if minutes: parts.append(f"{minutes}m")
-    parts.append(f"{secs}s")
-    return " ".join(parts)
-
-
-# --- UI Asset Matrix Assemblies ---
+# --- Premium Business Cyberpunk UI with Fire Ember Background Engine ---
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -313,7 +300,7 @@ DASHBOARD_HTML = """
         
         .btn-action { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; text-align: center; display: block; text-decoration: none; box-sizing: border-box; }
         .btn-action:hover { background: var(--neon); color: #fff; }
-        .btn-invoice { background: rgba(0, 240, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; margin-top: 6px; display: inline-block; }
+        .btn-invoice { background: rgba(0, 240, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; margin-top: 6px; display: inline-block; border-radius: 4px; }
         
         .ctrl-group { display: flex; gap: 4px; margin-top: 8px; }
         .ctrl-btn { padding: 4px 8px; font-size: 11px; font-weight: bold; border: 1px solid #444; background: #222; color: #ccc; cursor: pointer; border-radius: 4px; }
@@ -506,7 +493,7 @@ DASHBOARD_HTML = """
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ maintenance: chk.checked ? 'true' : 'false' })
                 });
-            } catch(e) { alert("Failed to switch maintenance engine pipeline configurations."); }
+            } catch(e) { alert("Failed to switch maintenance mode configurations."); }
         }
 
         async function modifyStatus(apptId, newStatus) {
@@ -635,11 +622,11 @@ DASHBOARD_HTML = """
             const target = document.getElementById('leaderboard-body-rows');
             try {
                 const r = await fetch('/api/leaderboard?limit=10');
-                const data = await r.json();rcade Leaderboard Registe
+                const data = await r.json();
                 if(data.length === 0) {
                     target.innerHTML = `<tr><td colspan="4" style="color:#8f8084; text-align:center;">No high scores mapped yet.</td></tr>`;
                     return;
-                }rcade Leaderboard Registe
+                }
                 let html = '';
                 data.forEach(row => {
                     html += `<tr>
@@ -673,7 +660,7 @@ DASHBOARD_HTML = """
 """
 
 
-# --- Web Routing Handlers ---
+# --- Core Web Interface Endpoints ---
 @app.route("/")
 def home_redirect():
     return redirect(url_for("admin_login"))
@@ -686,7 +673,7 @@ def admin_login():
     error = None
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
-            session["logged_in"] = Truercade Leaderboard Registe
+            session["logged_in"] = True
             return redirect(url_for("admin_dashboard"))
         else:
             error = "Invalid credential configuration."
@@ -708,7 +695,7 @@ def admin_logout():
     return redirect(url_for("admin_login"))
 
 
-# --- Persistent Configurations Overrides ---
+# --- Persistent Configuration Overrides ---
 @app.route("/api/internal/smtp", methods=["GET"])
 @require_admin_session
 def get_smtp_settings():
@@ -767,7 +754,7 @@ def get_internal_appointments():
 
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
-    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-15", "updated": True})
+    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
 
 
 @app.route("/api/services", methods=["GET"])
@@ -775,7 +762,7 @@ def get_services():
     return jsonify(SERVICES)
 
 
-# ---- CLIENT PROFILER MATRIX ----
+# ---- CLIENT RECORDS ENDPOINTS ----
 @app.route("/api/records", methods=["GET"])
 def get_records():
     with get_db() as conn:
@@ -831,7 +818,7 @@ def delete_record(record_id):
     return jsonify({"message": "Record deleted"})
 
 
-# ---- LEADERSHIP HIGH SCORES MATRIX ----
+# ---- MINI GAME SYSTEM ENDPOINTS ----
 @app.route("/api/game-scores", methods=["GET"])
 def get_scores():
     with get_db() as conn:
@@ -870,7 +857,7 @@ def leaderboard():
     return jsonify([dict(r) for r in rows])
 
 
-# ---- SQUARESAPCE INTAKE ENDPOINTS ----
+# ---- SECURE INTERNAL PUBLIC SQUARESAPCE ENDPOINTS ----
 @app.route("/api/appointments", methods=["GET"])
 @require_api_key
 def get_appointments():
@@ -951,7 +938,7 @@ def delete_appointment_endpoint(appt_id):
     return jsonify({"message": "Appointment storage mapping dropped."})
 
 
-# ---- ONLINE HEARTBEAT MONITOR TRACKERS ----
+# ---- HEARTBEAT TRACKING LOGIC ----
 @app.route("/api/online", methods=["GET", "POST"])
 def heartbeat():
     if request.method == "POST":
@@ -962,6 +949,19 @@ def heartbeat():
     expired = [uid for uid, last_seen in ONLINE_USERS.items() if now - last_seen > ONLINE_TIMEOUT]
     for uid in expired: del ONLINE_USERS[uid]
     return jsonify({"online": len(ONLINE_USERS)})
+
+
+def format_uptime(seconds):
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    parts = []
+    if days: parts.append(f"{days}d")
+    if hours: parts.append(f"{hours}h")
+    if minutes: parts.append(f"{minutes}m")
+    parts.append(f"{secs}s")
+    return " ".join(parts)
 
 
 @app.route("/api/health", methods=["GET"])
@@ -984,7 +984,34 @@ def health():
     })
 
 
+@app.route("/api/test-email", methods=["POST"])
+@require_api_key
+def test_email():
+    data = request.get_json()
+    cfg = get_smtp_config()
+    if not data or not data.get("email"):
+        return jsonify({"error": "Provide an email in the body: {\"email\": \"you@email.com\"}"}), 400
+    if not cfg.get("smtp_pass"):
+        return jsonify({"error": "SMTP config passkey is not defined in system configurations."}), 500
+    try:
+        test_data = {
+            "email": data["email"],
+            "name": data.get("name", "Test User"),
+            "message_type": "Swedish Massage",
+            "date": "2026-06-15",
+            "time": "10:00",
+        }
+        result = send_confirmation_email(test_data)
+        if result:
+            return jsonify({"status": "Email sent successfully!", "to": data["email"]})
+        else:
+            return jsonify({"error": "Email failed. Check logs."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 init_db()
+
 
 def _keep_alive():
     url = "https://api-1ilr.onrender.com/api/health"
@@ -993,7 +1020,10 @@ def _keep_alive():
         except: pass
         time.sleep(600)
 
+
 threading.Thread(target=_keep_alive, daemon=True).start()
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    # Fixed: Read port dynamically from Render's Assigned Environment variables
+    port_val = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host="0.0.0.0", port=port_val)
