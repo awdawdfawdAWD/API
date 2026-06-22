@@ -19,6 +19,9 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placehold
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
+# Pull Squarespace API key securely from environment (Set this up in Render)
+SQUARESPACE_API_KEY = os.environ.get("SQUARESPACE_API_KEY", "")
+
 # Enforced cross-origin script authorization 
 CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
 
@@ -31,6 +34,7 @@ MAX_HISTORY = 60
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
 
+# Local cache dictionary. The background daemon loop overrides prices directly here.
 SERVICES = {
     "Swedish Massage": {"duration": "60 min", "price": 100},
     "Deep Tissue Restoration": {"duration": "90 min", "price": 140},
@@ -852,8 +856,56 @@ def test_email():
         return jsonify({"error": str(e)}), 500
 
 
+# ---- SQUARESAPCE AUTOMATED PRICE STREAM ENGINE ----
+
+def sync_squarespace_prices():
+    """Background loop checking and updating localized cached pricing from Squarespace every 2 minutes."""
+    if not SQUARESPACE_API_KEY:
+        print("[Squarespace Sync Warning] SQUARESPACE_API_KEY environment configuration is missing.")
+        return
+
+    url = "https://api.squarespace.com/v2/commerce/products"
+    
+    while True:
+        try:
+            req = urllib.request.Request(url, method="GET")
+            req.add_header("Authorization", f"Bearer {SQUARESPACE_API_KEY}")
+            req.add_header("User-Agent", "BelsMagicHandsMassage/1.0 (Dynamic Sync)")
+            
+            with urllib.request.urlopen(req, timeout=15) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    products = data.get("products", [])
+                    
+                    for prod in products:
+                        prod_name = prod.get("name")
+                        variants = prod.get("variants", [])
+                        
+                        # Match Squarespace item names dynamically with localized dictionary keys
+                        if prod_name in SERVICES and variants:
+                            price_data = variants[0].get("price", {})
+                            if isinstance(price_data, dict) and "value" in price_data:
+                                try:
+                                    live_price = float(price_data["value"])
+                                    # Override cache instantly upon discrepancy discoverability
+                                    if SERVICES[prod_name]["price"] != live_price:
+                                        print(f"[Sync Activity] Altered cost variant for '{prod_name}': ${live_price}")
+                                        SERVICES[prod_name]["price"] = live_price
+                                except (ValueError, TypeError):
+                                    continue
+                                    
+        except Exception as e:
+            print(f"[Sync Exception Raised] Squarespace validation failure: {e}")
+            
+        # Strict validation loop interval check execution context window constraints (120 seconds = 2 minutes)
+        time.sleep(120)
+
+
+# Initialize Database Context 
 init_db()
 
+# Spawn Asynchronous Daemon Tracking Threads
+threading.Thread(target=sync_squarespace_prices, daemon=True).start()
 
 def _keep_alive():
     url = "https://api-1ilr.onrender.com/api/health"
