@@ -100,7 +100,8 @@ def init_db():
             ("smtp_user", os.environ.get("SMTP_USER", "bels_massage@belsmagichandsmassage.com")),
             ("smtp_pass", os.environ.get("SMTP_PASS", "")),
             ("maintenance_mode", "false"),
-            ("tos_global_version", "1")
+            ("tos_version", "3.0"),
+            ("tos_effective_date", "2026-06-22")
         ]
         for key, val in defaults:
             conn.execute("INSERT OR IGNORE INTO config_settings (key, value) VALUES (?, ?)", (key, val))
@@ -232,7 +233,7 @@ def send_invoice_email_worker(appt):
         return False
 
 
-# --- Login Dashboard UI Engine ---
+# --- Premium Business Cyberpunk UI with Fire Ember Background Engine ---
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -337,7 +338,7 @@ DASHBOARD_HTML = """
         input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
 
         .modal-bg { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:10000; }
-        .modal-box { background:var(--panel); border:1px solid var(--border); padding:30px; border-radius:12px; width:400px; }
+        .modal-box { background:var(--panel); border:1px solid var(--neon); padding:30px; border-radius:12px; width:400px; }
         .modal-box label { display:block; font-size:12px; color:#8f8084; margin-bottom:6px; text-transform:uppercase; }
         .modal-box input, .modal-box textarea { width:100%; padding:10px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:6px; color:#fff; box-sizing:border-box; margin-bottom:15px; outline:none; }
         .modal-flex { display:flex; gap:10px; }
@@ -361,10 +362,8 @@ DASHBOARD_HTML = """
                 <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Secondary Sub-Tables</button>
             </div>
         </div>
-        <div>
-            <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
-            <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
-        </div>
+        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
+        <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
     </div>
 
     <div class="main-frame">
@@ -394,9 +393,14 @@ DASHBOARD_HTML = """
                             </label>
                         </div>
 
+                        <h3>Terms of Service Control</h3>
+                        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan);" onclick="resetTosPopup()">🔄 RESET TOS POPUP (FORCE RE-ACCEPT)</button>
+
+                        <br>
                         <h3>View Application Schemas</h3>
                         <button class="btn-action" onclick="fetchInternalData('/api/internal/appointments', 'appointments-json')">Load Appointments Matrix</button>
                         <button class="btn-action" onclick="fetchInternalData('/api/services', 'appointments-json')">Inspect Active Services</button>
+                        <button class="btn-action" onclick="fetchInternalData('/api/tos', 'appointments-json')">View Terms API Node</button>
                         <div id="appointments-json" class="json-output" style="display:none;"></div>
                     </div>
                 </div>
@@ -500,6 +504,17 @@ DASHBOARD_HTML = """
                     dot.className = "radar-dot online";
                 }
             } catch(e) { alert("Failed to switch maintenance mode configurations."); }
+        }
+
+        async function resetTosPopup() {
+            if(!confirm("Force all Squarespace visitors to re-accept the Terms of Service? This bumps version tracking metadata.")) return;
+            try {
+                const r = await fetch('/api/internal/tos/reset', { method: 'POST' });
+                const d = await r.json();
+                if(d.status === 'success') {
+                    alert(`ToS matrix pushed to Version ${d.new_version} (${d.new_date}). Popups will trigger globally on next visit reload.`);
+                } else { alert("Failed to communicate update sequence to DB config node."); }
+            } catch(e) { alert("Network fault initiating ToS reset sequence."); }
         }
 
         async function modifyStatus(apptId, newStatus) {
@@ -788,6 +803,38 @@ def save_maintenance_settings():
     return jsonify({"status": "success"})
 
 
+# --- ToS Automation and Version Control Endpoints ---
+@app.route("/api/internal/tos/reset", methods=["POST"])
+@require_admin_session
+def trigger_tos_reset():
+    try:
+        current_version = float(get_config_val("tos_version", "3.0"))
+    except ValueError:
+        current_version = 3.0
+    
+    new_version = f"{current_version + 0.1:.1f}"
+    new_date = datetime.now().strftime("%Y-%m-%d")
+    
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('tos_version', ?)", (new_version,))
+        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('tos_effective_date', ?)", (new_date,))
+        conn.commit()
+        
+    return jsonify({"status": "success", "new_version": new_version, "new_date": new_date})
+
+
+@app.route("/api/tos", methods=["GET"])
+def get_tos():
+    version = get_config_val("tos_version", "3.0")
+    eff_date = get_config_val("tos_effective_date", "2026-06-22")
+    return jsonify({
+        "version": version, 
+        "title": "Terms of Service", 
+        "effectiveDate": eff_date, 
+        "updated": True
+    })
+
+
 # --- Invoice Automation Thread Dispatchers ---
 @app.route("/api/internal/appointments/<int:appt_id>/invoice", methods=["POST"])
 @require_admin_session
@@ -811,18 +858,6 @@ def get_internal_appointments():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
     return jsonify([dict(r) for r in rows])
-
-
-# Public endpoint used directly by your Squarespace Code Injection popup
-@app.route("/api/tos", methods=["GET"])
-def get_tos():
-    tos_version = get_config_val("tos_global_version", "1")
-    return jsonify({
-        "version": tos_version, 
-        "title": "Terms & Conditions", 
-        "effectiveDate": "2026-06-22", 
-        "updated": True
-    })
 
 
 @app.route("/api/services", methods=["GET"])
@@ -955,14 +990,8 @@ def create_appointment():
     missing = [f for f in required if not data or not data.get(f, "").strip()]
     if missing: return jsonify({"error": f"Missing: {', '.join(missing)}"}), 400
 
-    fallback_svc = SERVICES.get(data.get("message_type", ""), {})
-    fallback_price = fallback_svc.get("price", 0)
-
-    price = data.get("price", fallback_price)
-    try:
-        price = float(price)
-    except (ValueError, TypeError):
-        price = fallback_price
+    svc = SERVICES.get(data.get("message_type", ""), {})
+    price = svc.get("price", 0)
 
     with get_db() as conn:
         cur = conn.execute(
@@ -992,8 +1021,7 @@ def update_appointment(appt_id):
         if "name" in data: conn.execute("UPDATE appointments SET name = ? WHERE id = ?", (data["name"], appt_id))
         if "message_type" in data:
             svc = SERVICES.get(data["message_type"], {})
-            new_price = data.get("price", svc.get("price", 0))
-            conn.execute("UPDATE appointments SET message_type = ?, price = ? WHERE id = ?", (data["message_type"], new_price, appt_id))
+            conn.execute("UPDATE appointments SET message_type = ?, price = ? WHERE id = ?", (data["message_type"], svc.get("price", 0), appt_id))
         if "date" in data: conn.execute("UPDATE appointments SET date = ? WHERE id = ?", (data["date"], appt_id))
         if "time" in data: conn.execute("UPDATE appointments SET time = ? WHERE id = ?", (data["time"], appt_id))
         if "notes" in data: conn.execute("UPDATE appointments SET notes = ? WHERE id = ?", (data["notes"], appt_id))
