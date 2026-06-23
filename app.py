@@ -5,7 +5,6 @@ import sqlite3
 import smtplib
 import threading
 import urllib.request
-import signal  # Added for handling Render deployment signals
 from datetime import datetime
 from functools import wraps
 from email.mime.text import MIMEText
@@ -20,8 +19,16 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placehold
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
-# Enforced cross-origin script authorization 
-CORS(app, resources={r"/api/*": {"origins": ["www.belsmagichandsmassage.com"]}})
+# Enforced cross-origin script authorization - updated for your live public domains
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://www.belsmagichandsmassage.com",
+            "https://belsmagichandsmassage.com",
+            "https://icosahedron-pug-dad8.squarespace.com"
+        ]
+    }
+})
 
 ONLINE_USERS = {}
 ONLINE_TIMEOUT = 60
@@ -109,11 +116,8 @@ def init_db():
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-        
-        # Automatically bring the API back online when the new build successfully boots up
-        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', 'false')")
         conn.commit()
-    print("Database connection structural mappings validated. Application marked ONLINE.")
+    print("Database connection structural mappings validated.")
 
 
 def get_config_val(key, default=""):
@@ -313,13 +317,6 @@ DASHBOARD_HTML = """
         .view-pane.active { display: block; }
         .grid-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
         .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 25px rgba(0,0,0,0.3); margin-bottom: 20px; }
-        
-        /* Auto-scanning header layout elements */
-        .panel-header-flex { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px; }
-        .panel-header-flex h3 { margin: 0; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .scan-badge { font-size: 10px; background: rgba(0, 255, 204, 0.15); color: #00ffcc; padding: 4px 8px; border-radius: 4px; font-weight: bold; letter-spacing: 1px; animation: pulseScan 1.5s infinite; }
-        @keyframes pulseScan { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-
         .panel h3 { margin: 0 0 20px; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
         .record-card { background: #1d1618; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid var(--neon); display: flex; justify-content: space-between; align-items: center; }
         .record-card .name { font-weight: 600; color: #fff; font-size: 15px; }
@@ -387,10 +384,7 @@ DASHBOARD_HTML = """
             <div id="pane-appointments" class="view-pane active">
                 <div class="grid-layout">
                     <div class="panel">
-                        <div class="panel-header-flex">
-                            <h3>Appointments Storage Logs</h3>
-                            <div class="scan-badge">📡 LIVE AUTOMATIC SCANNING</div>
-                        </div>
+                        <h3>Appointments Storage Logs</h3>
                         <div id="appointments-list-target">
                             <p style="color:#8f8084; font-style:italic; font-size:14px;">Connecting to structural logs...</p>
                         </div>
@@ -1082,20 +1076,6 @@ def test_email():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# --- Graceful Render Handover & Build Handshaking ---
-def handle_render_shutdown(signum, frame):
-    """Triggered on Render deployment: forces old instance into maintenance mode."""
-    print("SIGTERM received from Render. Entering maintenance mode for deployment handover...")
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', 'true')")
-            conn.commit()
-    except Exception as e:
-        print(f"Error handling automated deployment state change: {e}")
-
-# Catch Render deployment container shutdown signal
-signal.signal(signal.SIGTERM, handle_render_shutdown)
 
 init_db()
 
