@@ -99,7 +99,8 @@ def init_db():
             ("smtp_port", "587"),
             ("smtp_user", os.environ.get("SMTP_USER", "bels_massage@belsmagichandsmassage.com")),
             ("smtp_pass", os.environ.get("SMTP_PASS", "")),
-            ("maintenance_mode", "false")
+            ("maintenance_mode", "false"),
+            ("tos_global_version", "1")
         ]
         for key, val in defaults:
             conn.execute("INSERT OR IGNORE INTO config_settings (key, value) VALUES (?, ?)", (key, val))
@@ -336,7 +337,7 @@ DASHBOARD_HTML = """
         input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
 
         .modal-bg { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:10000; }
-        .modal-box { background:var(--panel); border:1px solid var(--neon); padding:30px; border-radius:12px; width:400px; }
+        .modal-box { background:var(--panel); border:1px solid var(--border); padding:30px; border-radius:12px; width:400px; }
         .modal-box label { display:block; font-size:12px; color:#8f8084; margin-bottom:6px; text-transform:uppercase; }
         .modal-box input, .modal-box textarea { width:100%; padding:10px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:6px; color:#fff; box-sizing:border-box; margin-bottom:15px; outline:none; }
         .modal-flex { display:flex; gap:10px; }
@@ -360,8 +361,11 @@ DASHBOARD_HTML = """
                 <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Secondary Sub-Tables</button>
             </div>
         </div>
-        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
-        <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
+        <div>
+            <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
+            <button class="btn-action" style="border-color:#e1b12c; color:#e1b12c; margin-bottom: 12px;" onclick="resetGlobalToS()">🔄 RESET GLOBAL TOS POPUP</button>
+            <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
+        </div>
     </div>
 
     <div class="main-frame">
@@ -472,6 +476,20 @@ DASHBOARD_HTML = """
                     <button type="button" onclick="closeSmtpModal()" style="background:#4a3a3d; color:#fff; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">CANCEL</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="tosModal" style="display:none;">
+        <div class="modal-box" style="width: 500px; border-color: #e1b12c;">
+            <h4 style="color:#e1b12c; margin:0 0 15px; text-transform:uppercase;">System Terms of Service</h4>
+            <div style="background:rgba(0,0,0,0.4); border:1px solid var(--border); padding:15px; border-radius:6px; max-height:220px; overflow-y:auto; font-size:13px; color:#ccc; margin-bottom:20px; line-height:1.5;">
+                <p><strong>Effective Deployment:</strong> 2026-06-22 (v3.0)</p>
+                <p>Welcome to the Management Command Center. By acknowledging this prompt, you confirm adherence to institutional access controls, authorized configuration overwrite directives, and security parameters regarding client profile registries and arcade score databases.</p>
+                <p>All pipeline modifications, SMTP transitions, and background worker interactions executed inside this administrator scope are monitored and cached permanently.</p>
+            </div>
+            <div class="modal-flex">
+                <button type="button" onclick="acknowledgeToS()" style="background:#e1b12c; color:#000; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">I ACKNOWLEDGE SYSTEM DIRECTIVES</button>
+            </div>
         </div>
     </div>
 
@@ -708,9 +726,43 @@ DASHBOARD_HTML = """
             } catch (err) {}
         }
 
+        // --- ToS POPUP CONTROL TELEMETRY ---
+        async function checkToSStatus() {
+            try {
+                const r = await fetch('/api/internal/tos-status');
+                const data = await r.json();
+                const localAckVersion = localStorage.getItem('acknowledged_tos_version');
+                
+                if (localAckVersion !== data.tos_version) {
+                    document.getElementById('tosModal').style.display = 'flex';
+                    window.currentServerTosVersion = data.tos_version;
+                }
+            } catch(e) { console.error("Error evaluating internal ToS pipeline:", e); }
+        }
+
+        function acknowledgeToS() {
+            if (window.currentServerTosVersion) {
+                localStorage.setItem('acknowledged_tos_version', window.currentServerTosVersion);
+            }
+            document.getElementById('tosModal').style.display = 'none';
+        }
+
+        async function resetGlobalToS() {
+            if (!confirm("Force all administration sessions to re-acknowledge the Terms of Service next time they initialize?")) return;
+            try {
+                const r = await fetch('/api/internal/tos-reset', { method: 'POST' });
+                const data = await r.json();
+                if (data.status === 'success') {
+                    alert(`Global ToS mutation targeted. Active version token pushed to registry v${data.new_version}.`);
+                    checkToSStatus();
+                }
+            } catch(e) { alert("Exception handling asynchronous version mutation."); }
+        }
+
         // Run baseline setup routines on initialization
         updateAppointmentsLog();
         syncTelemetry();
+        checkToSStatus();
 
         // 2-Second loop execution for automatic updates 
         setInterval(updateAppointmentsLog, 2000);
@@ -786,6 +838,29 @@ def save_maintenance_settings():
     return jsonify({"status": "success"})
 
 
+# --- ToS Global Visibility State Endpoints ---
+@app.route("/api/internal/tos-status", methods=["GET"])
+@require_admin_session
+def get_tos_status():
+    tos_version = get_config_val("tos_global_version", "1")
+    return jsonify({"tos_version": tos_version})
+
+
+@app.route("/api/internal/tos-reset", methods=["POST"])
+@require_admin_session
+def reset_tos_status():
+    try:
+        current_version = int(get_config_val("tos_global_version", "1"))
+    except (ValueError, TypeError):
+        current_version = 1
+    new_version = str(current_version + 1)
+    
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('tos_global_version', ?)", (new_version,))
+        conn.commit()
+    return jsonify({"status": "success", "new_version": new_version})
+
+
 # --- Invoice Automation Thread Dispatchers ---
 @app.route("/api/internal/appointments/<int:appt_id>/invoice", methods=["POST"])
 @require_admin_session
@@ -813,7 +888,7 @@ def get_internal_appointments():
 
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
-    return jsonify({"version": "2.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
+    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
 
 
 @app.route("/api/services", methods=["GET"])
