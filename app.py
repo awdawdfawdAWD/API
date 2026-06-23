@@ -946,8 +946,15 @@ def create_appointment():
     missing = [f for f in required if not data or not data.get(f, "").strip()]
     if missing: return jsonify({"error": f"Missing: {', '.join(missing)}"}), 400
 
-    svc = SERVICES.get(data.get("message_type", ""), {})
-    price = svc.get("price", 0)
+    fallback_svc = SERVICES.get(data.get("message_type", ""), {})
+    fallback_price = fallback_svc.get("price", 0)
+
+    # Accept the active frontend calculated price directly to preserve live Squarespace sale rates
+    price = data.get("price", fallback_price)
+    try:
+        price = float(price)
+    except (ValueError, TypeError):
+        price = fallback_price
 
     with get_db() as conn:
         cur = conn.execute(
@@ -977,7 +984,8 @@ def update_appointment(appt_id):
         if "name" in data: conn.execute("UPDATE appointments SET name = ? WHERE id = ?", (data["name"], appt_id))
         if "message_type" in data:
             svc = SERVICES.get(data["message_type"], {})
-            conn.execute("UPDATE appointments SET message_type = ?, price = ? WHERE id = ?", (data["message_type"], svc.get("price", 0), appt_id))
+            new_price = data.get("price", svc.get("price", 0))
+            conn.execute("UPDATE appointments SET message_type = ?, price = ? WHERE id = ?", (data["message_type"], new_price, appt_id))
         if "date" in data: conn.execute("UPDATE appointments SET date = ? WHERE id = ?", (data["date"], appt_id))
         if "time" in data: conn.execute("UPDATE appointments SET time = ? WHERE id = ?", (data["time"], appt_id))
         if "notes" in data: conn.execute("UPDATE appointments SET notes = ? WHERE id = ?", (data["notes"], appt_id))
