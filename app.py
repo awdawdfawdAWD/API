@@ -5,6 +5,7 @@ import sqlite3
 import smtplib
 import threading
 import urllib.request
+import signal  # Added for handling Render deployment signals
 from datetime import datetime
 from functools import wraps
 from email.mime.text import MIMEText
@@ -99,9 +100,7 @@ def init_db():
             ("smtp_port", "587"),
             ("smtp_user", os.environ.get("SMTP_USER", "bels_massage@belsmagichandsmassage.com")),
             ("smtp_pass", os.environ.get("SMTP_PASS", "")),
-            ("maintenance_mode", "false"),
-            ("tos_version", "3.0"),
-            ("tos_effective_date", "2026-06-22")
+            ("maintenance_mode", "false")
         ]
         for key, val in defaults:
             conn.execute("INSERT OR IGNORE INTO config_settings (key, value) VALUES (?, ?)", (key, val))
@@ -110,8 +109,11 @@ def init_db():
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        
+        # Automatically bring the API back online when the new build successfully boots up
+        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', 'false')")
         conn.commit()
-    print("Database connection structural mappings validated.")
+    print("Database connection structural mappings validated. Application marked ONLINE.")
 
 
 def get_config_val(key, default=""):
@@ -311,6 +313,13 @@ DASHBOARD_HTML = """
         .view-pane.active { display: block; }
         .grid-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
         .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 25px rgba(0,0,0,0.3); margin-bottom: 20px; }
+        
+        /* Auto-scanning header layout elements */
+        .panel-header-flex { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px; }
+        .panel-header-flex h3 { margin: 0; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .scan-badge { font-size: 10px; background: rgba(0, 255, 204, 0.15); color: #00ffcc; padding: 4px 8px; border-radius: 4px; font-weight: bold; letter-spacing: 1px; animation: pulseScan 1.5s infinite; }
+        @keyframes pulseScan { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
         .panel h3 { margin: 0 0 20px; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
         .record-card { background: #1d1618; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid var(--neon); display: flex; justify-content: space-between; align-items: center; }
         .record-card .name { font-weight: 600; color: #fff; font-size: 15px; }
@@ -378,7 +387,10 @@ DASHBOARD_HTML = """
             <div id="pane-appointments" class="view-pane active">
                 <div class="grid-layout">
                     <div class="panel">
-                        <h3>Appointments Storage Logs</h3>
+                        <div class="panel-header-flex">
+                            <h3>Appointments Storage Logs</h3>
+                            <div class="scan-badge">📡 LIVE AUTOMATIC SCANNING</div>
+                        </div>
                         <div id="appointments-list-target">
                             <p style="color:#8f8084; font-style:italic; font-size:14px;">Connecting to structural logs...</p>
                         </div>
@@ -393,10 +405,6 @@ DASHBOARD_HTML = """
                             </label>
                         </div>
 
-                        <h3>Terms of Service Control</h3>
-                        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan);" onclick="resetTosPopup()">🔄 RESET TOS POPUP (FORCE RE-ACCEPT)</button>
-
-                        <br>
                         <h3>View Application Schemas</h3>
                         <button class="btn-action" onclick="fetchInternalData('/api/internal/appointments', 'appointments-json')">Load Appointments Matrix</button>
                         <button class="btn-action" onclick="fetchInternalData('/api/services', 'appointments-json')">Inspect Active Services</button>
@@ -504,17 +512,6 @@ DASHBOARD_HTML = """
                     dot.className = "radar-dot online";
                 }
             } catch(e) { alert("Failed to switch maintenance mode configurations."); }
-        }
-
-        async function resetTosPopup() {
-            if(!confirm("Force all Squarespace visitors to re-accept the Terms of Service? This bumps version tracking metadata.")) return;
-            try {
-                const r = await fetch('/api/internal/tos/reset', { method: 'POST' });
-                const d = await r.json();
-                if(d.status === 'success') {
-                    alert(`ToS matrix pushed to Version ${d.new_version} (${d.new_date}). Popups will trigger globally on next visit reload.`);
-                } else { alert("Failed to communicate update sequence to DB config node."); }
-            } catch(e) { alert("Network fault initiating ToS reset sequence."); }
         }
 
         async function modifyStatus(apptId, newStatus) {
@@ -803,38 +800,6 @@ def save_maintenance_settings():
     return jsonify({"status": "success"})
 
 
-# --- ToS Automation and Version Control Endpoints ---
-@app.route("/api/internal/tos/reset", methods=["POST"])
-@require_admin_session
-def trigger_tos_reset():
-    try:
-        current_version = float(get_config_val("tos_version", "3.0"))
-    except ValueError:
-        current_version = 3.0
-    
-    new_version = f"{current_version + 0.1:.1f}"
-    new_date = datetime.now().strftime("%Y-%m-%d")
-    
-    with get_db() as conn:
-        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('tos_version', ?)", (new_version,))
-        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('tos_effective_date', ?)", (new_date,))
-        conn.commit()
-        
-    return jsonify({"status": "success", "new_version": new_version, "new_date": new_date})
-
-
-@app.route("/api/tos", methods=["GET"])
-def get_tos():
-    version = get_config_val("tos_version", "3.0")
-    eff_date = get_config_val("tos_effective_date", "2026-06-22")
-    return jsonify({
-        "version": version, 
-        "title": "Terms of Service", 
-        "effectiveDate": eff_date, 
-        "updated": True
-    })
-
-
 # --- Invoice Automation Thread Dispatchers ---
 @app.route("/api/internal/appointments/<int:appt_id>/invoice", methods=["POST"])
 @require_admin_session
@@ -858,6 +823,11 @@ def get_internal_appointments():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/tos", methods=["GET"])
+def get_tos():
+    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
 
 
 @app.route("/api/services", methods=["GET"])
@@ -1112,6 +1082,20 @@ def test_email():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# --- Graceful Render Handover & Build Handshaking ---
+def handle_render_shutdown(signum, frame):
+    """Triggered on Render deployment: forces old instance into maintenance mode."""
+    print("SIGTERM received from Render. Entering maintenance mode for deployment handover...")
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', 'true')")
+            conn.commit()
+    except Exception as e:
+        print(f"Error handling automated deployment state change: {e}")
+
+# Catch Render deployment container shutdown signal
+signal.signal(signal.SIGTERM, handle_render_shutdown)
 
 init_db()
 
