@@ -21,7 +21,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholde
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
 # Enforced cross-origin script authorization 
-CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
+CORS(app, resources={r"/api/*": {"origins": ["www.belsmagichandsmassage.com"]}})
 
 ONLINE_USERS = {}
 ONLINE_TIMEOUT = 60
