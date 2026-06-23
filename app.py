@@ -19,12 +19,14 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placehold
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
-# Enforced cross-origin script authorization - Updated to allow custom headers & methods
+# Enforced cross-origin script authorization - updated for your live public domains
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://icosahedron-pug-dad8.squarespace.com"],
-        "allow_headers": ["Content-Type", "X-API-Key"],
-        "methods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+        "origins": [
+            "https://www.belsmagichandsmassage.com",
+            "https://belsmagichandsmassage.com",
+            "https://icosahedron-pug-dad8.squarespace.com"
+        ]
     }
 })
 
