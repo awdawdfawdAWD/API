@@ -108,6 +108,7 @@ def init_db():
             conn.execute("ALTER TABLE appointments ADD COLUMN price REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        conn.commit()
     print("Database connection structural mappings validated.")
 
 
@@ -163,12 +164,19 @@ def send_confirmation_email(data):
         msg["To"] = data["email"]
         msg.attach(MIMEText(html, "html"))
 
-        with smtplib.SMTP(cfg["smtp_host"], int(cfg["smtp_port"]), timeout=15) as server:
-            server.starttls()
-            server.login(cfg["smtp_user"], cfg["smtp_pass"])
-            server.sendmail(cfg["smtp_user"], data["email"], msg.as_string())
+        port = int(cfg.get("smtp_port", 587))
+        if port == 465:
+            with smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=15) as server:
+                server.login(cfg["smtp_user"], cfg["smtp_pass"])
+                server.sendmail(cfg["smtp_user"], data["email"], msg.as_string())
+        else:
+            with smtplib.SMTP(cfg["smtp_host"], port, timeout=15) as server:
+                server.starttls()
+                server.login(cfg["smtp_user"], cfg["smtp_pass"])
+                server.sendmail(cfg["smtp_user"], data["email"], msg.as_string())
         return True
-    except:
+    except Exception as e:
+        print(f"SMTP Error: {e}")
         return False
 
 
@@ -207,12 +215,19 @@ def send_invoice_email_worker(appt):
         msg["To"] = appt["email"]
         msg.attach(MIMEText(html, "html"))
 
-        with smtplib.SMTP(cfg["smtp_host"], int(cfg["smtp_port"]), timeout=15) as server:
-            server.starttls()
-            server.login(cfg["smtp_user"], cfg["smtp_pass"])
-            server.sendmail(cfg["smtp_user"], appt["email"], msg.as_string())
+        port = int(cfg.get("smtp_port", 587))
+        if port == 465:
+            with smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=15) as server:
+                server.login(cfg["smtp_user"], cfg["smtp_pass"])
+                server.sendmail(cfg["smtp_user"], appt["email"], msg.as_string())
+        else:
+            with smtplib.SMTP(cfg["smtp_host"], port, timeout=15) as server:
+                server.starttls()
+                server.login(cfg["smtp_user"], cfg["smtp_pass"])
+                server.sendmail(cfg["smtp_user"], appt["email"], msg.as_string())
         return True
-    except:
+    except Exception as e:
+        print(f"SMTP Worker Error: {e}")
         return False
 
 
@@ -277,7 +292,6 @@ DASHBOARD_HTML = """
         .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 25px; box-sizing: border-box; }
         .brand-block { display: flex; align-items: center; gap: 12px; font-weight: 700; color: #fff; font-size: 15px; }
         
-        /* Updated dynamic status colors for the radar-dot indicator */
         .radar-dot { width: 10px; height: 10px; border-radius: 50%; transition: background 0.3s, box-shadow 0.3s; }
         .radar-dot.online { background: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
         .radar-dot.offline { background: #ff4a4a; box-shadow: 0 0 10px #ff4a4a; }
@@ -305,7 +319,7 @@ DASHBOARD_HTML = """
         
         .btn-action { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; text-align: center; display: block; text-decoration: none; box-sizing: border-box; }
         .btn-action:hover { background: var(--neon); color: #fff; }
-        .btn-invoice { background: rgba(0, 240, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; margin-top: 6px; display: inline-block; border-radius: 4px; }
+        .btn-invoice { background: rgba(0, 240, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; margin-top: 6px; display: inline-block; }
         
         .ctrl-group { display: flex; gap: 4px; margin-top: 8px; }
         .ctrl-btn { padding: 4px 8px; font-size: 11px; font-weight: bold; border: 1px solid #444; background: #222; color: #ccc; cursor: pointer; border-radius: 4px; }
@@ -364,31 +378,7 @@ DASHBOARD_HTML = """
                     <div class="panel">
                         <h3>Appointments Storage Logs</h3>
                         <div id="appointments-list-target">
-                            {% if appointments %}
-                                {% for appt in appointments %}
-                                <div class="record-card" id="appt-card-{{ appt.id }}">
-                                    <div>
-                                        <div class="name">{{ appt.name }}</div>
-                                        <div class="details">Type: {{ appt.message_type }} | Contact: {{ appt.phone or 'None' }}</div>
-                                        {% if appt.email %}<div class="details" style="color:#888;">Email: {{ appt.email }}</div>{% endif %}
-                                        {% if appt.notes %}<div class="details" style="color:#736467; font-style:italic;">* {{ appt.notes }}</div>{% endif %}
-                                        
-                                        <div class="ctrl-group">
-                                            <button class="ctrl-btn" onclick="modifyStatus('{{ appt.id }}', 'done')">✔ Done</button>
-                                            <button class="ctrl-btn" onclick="modifyStatus('{{ appt.id }}', 'cancelled')">❌ Cancel</button>
-                                            <button class="ctrl-btn danger" onclick="deleteAppointment('{{ appt.id }}')">🗑 Delete</button>
-                                        </div>
-                                        <button class="btn-invoice" onclick="sendInvoice('{{ appt.id }}')">⚡ DISPATCH EMAIL INVOICE</button>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <div style="font-weight: 600; font-size:14px; margin-bottom:4px;">{{ appt.date }} @ {{ appt.time }}</div>
-                                        <span class="status-pill {{ appt.status }}" id="status-pill-{{ appt.id }}">{{ appt.status }}</span>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            {% else %}
-                                <p style="color:#8f8084; font-style:italic; font-size:14px;">No active entries mapped to structural logs.</p>
-                            {% endif %}
+                            <p style="color:#8f8084; font-style:italic; font-size:14px;">Connecting to structural logs...</p>
                         </div>
                     </div>
                     <div class="panel">
@@ -501,8 +491,6 @@ DASHBOARD_HTML = """
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ maintenance: chk.checked ? 'true' : 'false' })
                 });
-                
-                // Instantly sync the visual dot class on manual structural toggling
                 const dot = document.getElementById('platform-status-dot');
                 if(chk.checked) {
                     dot.className = "radar-dot offline";
@@ -521,8 +509,10 @@ DASHBOARD_HTML = """
                 });
                 if(r.ok) {
                     const pill = document.getElementById(`status-pill-${apptId}`);
-                    pill.className = `status-pill ${newStatus}`;
-                    pill.innerText = newStatus;
+                    if(pill) {
+                        pill.className = `status-pill ${newStatus}`;
+                        pill.innerText = newStatus;
+                    }
                 } else { alert("Failed to modify state parameters."); }
             } catch(e) { alert("Network interaction fault updating status."); }
         }
@@ -534,7 +524,10 @@ DASHBOARD_HTML = """
                     method: 'DELETE',
                     headers: {'X-API-Key': 'bels-magic-hands-2026'}
                 });
-                if(r.ok) { document.getElementById(`appt-card-${apptId}`).remove(); }
+                if(r.ok) { 
+                    const el = document.getElementById(`appt-card-${apptId}`);
+                    if(el) el.remove(); 
+                }
                 else { alert("Authorization or lookup exception removing mapping."); }
             } catch(e) { alert("Execution crash communicating with drop channel."); }
         }
@@ -656,6 +649,45 @@ DASHBOARD_HTML = """
             } catch(e) { target.innerHTML = `<tr><td colspan="4" style="color:#ff4a4a;">Telemetry failure mapping arcade cluster scores.</td></tr>`; }
         }
 
+        async function updateAppointmentsLog() {
+            const container = document.getElementById('appointments-list-target');
+            if (!container) return;
+            try {
+                const r = await fetch('/api/internal/appointments');
+                const data = await r.json();
+                if (data.length === 0) {
+                    container.innerHTML = `<p style="color:#8f8084; font-style:italic; font-size:14px;">No active entries mapped to structural logs.</p>`;
+                    return;
+                }
+                let html = '';
+                data.forEach(appt => {
+                    html += `
+                    <div class="record-card" id="appt-card-${appt.id}">
+                        <div>
+                            <div class="name">${appt.name}</div>
+                            <div class="details">Type: ${appt.message_type} | Contact: ${appt.phone || 'None'}</div>
+                            ${appt.email ? `<div class="details" style="color:#888;">Email: ${appt.email}</div>` : ''}
+                            ${appt.notes ? `<div class="details" style="color:#736467; font-style:italic;">* ${appt.notes}</div>` : ''}
+                            
+                            <div class="ctrl-group">
+                                <button class="ctrl-btn" onclick="modifyStatus('${appt.id}', 'done')">✔ Done</button>
+                                <button class="ctrl-btn" onclick="modifyStatus('${appt.id}', 'cancelled')">❌ Cancel</button>
+                                <button class="ctrl-btn danger" onclick="deleteAppointment('${appt.id}')">🗑 Delete</button>
+                            </div>
+                            <button class="btn-invoice" onclick="sendInvoice('${appt.id}')">⚡ DISPATCH EMAIL INVOICE</button>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 600; font-size:14px; margin-bottom:4px;">${appt.date} @ ${appt.time}</div>
+                            <span class="status-pill ${appt.status}" id="status-pill-${appt.id}">${appt.status}</span>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+            } catch (err) {
+                console.log("Error updating appointments feed:", err);
+            }
+        }
+
         async function syncTelemetry() {
             try {
                 const response = await fetch('/api/health');
@@ -663,7 +695,6 @@ DASHBOARD_HTML = """
                 document.getElementById('nav-avail-val').innerText = metrics.availability + "%";
                 document.getElementById('nav-lat-val').innerText = metrics.latency + "ms";
                 
-                // Dynamically updates the sidebar indicator dot color based on application live state
                 const dot = document.getElementById('platform-status-dot');
                 if (metrics.status === 'maintenance') {
                     dot.className = "radar-dot offline";
@@ -676,7 +707,13 @@ DASHBOARD_HTML = """
                 document.getElementById('nav-online-val').innerText = userData.online;
             } catch (err) {}
         }
+
+        // Run baseline setup routines on initialization
+        updateAppointmentsLog();
         syncTelemetry();
+
+        // 2-Second loop execution for automatic updates 
+        setInterval(updateAppointmentsLog, 2000);
         setInterval(syncTelemetry, 4000);
     </script>
 </body>
@@ -708,9 +745,7 @@ def admin_login():
 @require_admin_session
 def admin_dashboard():
     m_mode = get_config_val("maintenance_mode", "false")
-    with get_db() as conn:
-        appointments = conn.execute("SELECT * FROM appointments ORDER BY date, time").fetchall()
-    return render_template_string(DASHBOARD_HTML, appointments=[dict(r) for r in appointments], maintenance=m_mode)
+    return render_template_string(DASHBOARD_HTML, maintenance=m_mode)
 
 
 @app.route("/api/logout")
