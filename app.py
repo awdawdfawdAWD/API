@@ -19,8 +19,14 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "temporary-dev-key-placehold
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "temporary-password-placeholder")
 API_KEY = os.environ.get("X_API_KEY", "bels-magic-hands-2026")
 
-# Enforced cross-origin script authorization 
-CORS(app, resources={r"/api/*": {"origins": ["https://icosahedron-pug-dad8.squarespace.com"]}})
+# Enforced cross-origin script authorization - Updated to allow custom headers & methods
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["https://icosahedron-pug-dad8.squarespace.com"],
+        "allow_headers": ["Content-Type", "X-API-Key"],
+        "methods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    }
+})
 
 ONLINE_USERS = {}
 ONLINE_TIMEOUT = 60
@@ -476,9 +482,6 @@ DASHBOARD_HTML = """
     </div>
 
     <script>
-        // Dynamically injected system API credentials
-        const API_KEY = "{{ api_key }}";
-
         function navigatePanel(btn, paneId) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
@@ -507,7 +510,7 @@ DASHBOARD_HTML = """
             try {
                 const r = await fetch(`/api/appointments/${apptId}`, {
                     method: 'PATCH',
-                    headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
+                    headers: {'Content-Type': 'application/json', 'X-API-Key': 'bels-magic-hands-2026'},
                     body: JSON.stringify({ status: newStatus })
                 });
                 if(r.ok) {
@@ -525,7 +528,7 @@ DASHBOARD_HTML = """
             try {
                 const r = await fetch(`/api/appointments/${apptId}`, {
                     method: 'DELETE',
-                    headers: {'X-API-Key': API_KEY}
+                    headers: {'X-API-Key': 'bels-magic-hands-2026'}
                 });
                 if(r.ok) { 
                     const el = document.getElementById(`appt-card-${apptId}`);
@@ -748,8 +751,7 @@ def admin_login():
 @require_admin_session
 def admin_dashboard():
     m_mode = get_config_val("maintenance_mode", "false")
-    # FIX: Explicitly passing API_KEY variable context into the Jinja rendering layer
-    return render_template_string(DASHBOARD_HTML, maintenance=m_mode, api_key=API_KEY)
+    return render_template_string(DASHBOARD_HTML, maintenance=m_mode)
 
 
 @app.route("/api/logout")
