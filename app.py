@@ -476,6 +476,9 @@ DASHBOARD_HTML = """
     </div>
 
     <script>
+        // Dynamically injected system API credentials
+        const API_KEY = "{{ api_key }}";
+
         function navigatePanel(btn, paneId) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
@@ -504,7 +507,7 @@ DASHBOARD_HTML = """
             try {
                 const r = await fetch(`/api/appointments/${apptId}`, {
                     method: 'PATCH',
-                    headers: {'Content-Type': 'application/json', 'X-API-Key': 'bels-magic-hands-2026'},
+                    headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
                     body: JSON.stringify({ status: newStatus })
                 });
                 if(r.ok) {
@@ -522,7 +525,7 @@ DASHBOARD_HTML = """
             try {
                 const r = await fetch(`/api/appointments/${apptId}`, {
                     method: 'DELETE',
-                    headers: {'X-API-Key': 'bels-magic-hands-2026'}
+                    headers: {'X-API-Key': API_KEY}
                 });
                 if(r.ok) { 
                     const el = document.getElementById(`appt-card-${apptId}`);
@@ -745,7 +748,8 @@ def admin_login():
 @require_admin_session
 def admin_dashboard():
     m_mode = get_config_val("maintenance_mode", "false")
-    return render_template_string(DASHBOARD_HTML, maintenance=m_mode)
+    # FIX: Explicitly passing API_KEY variable context into the Jinja rendering layer
+    return render_template_string(DASHBOARD_HTML, maintenance=m_mode, api_key=API_KEY)
 
 
 @app.route("/api/logout")
@@ -1069,37 +1073,9 @@ def test_email():
         return jsonify({"error": str(e)}), 500
 
 
-# --- New Startup Automation Routine ---
-def automated_startup_maintenance_cycle():
-    """
-    Forces the application into maintenance mode upon boot/deployment,
-    allowing initialization and networking parameters to stabilize,
-    then automatically returns the application back to online state.
-    """
-    try:
-        with get_db() as conn:
-            conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', 'true')")
-            conn.commit()
-        print("[DEPLOYMENT ENGINE] System locked into startup MAINTENANCE MODE successfully.")
-        
-        # Safe structural warmup sleep window (20 seconds)
-        time.sleep(20)
-        
-        with get_db() as conn:
-            conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('maintenance_mode', 'false')")
-            conn.commit()
-        print("[DEPLOYMENT ENGINE] Startup cycles processed. Application restored to LIVE state automatically.")
-    except Exception as e:
-        print(f"[DEPLOYMENT ENGINE] Warning initializing automatic startup lifecycle changes: {e}")
-
-
-# Initialize structural database matrices
 init_db()
 
-# Target and trigger the deployment cycle automated thread
-threading.Thread(target=automated_startup_maintenance_cycle, daemon=True).start()
 
-# Keep alive loop execution
 def _keep_alive():
     url = "https://api-1ilr.onrender.com/api/health"
     while True:
