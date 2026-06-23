@@ -232,7 +232,7 @@ def send_invoice_email_worker(appt):
         return False
 
 
-# --- Premium Business Cyberpunk UI with Fire Ember Background Engine ---
+# --- Login Dashboard UI Engine ---
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -363,7 +363,6 @@ DASHBOARD_HTML = """
         </div>
         <div>
             <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
-            <button class="btn-action" style="border-color:#e1b12c; color:#e1b12c; margin-bottom: 12px;" onclick="resetGlobalToS()">🔄 RESET GLOBAL TOS POPUP</button>
             <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
         </div>
     </div>
@@ -398,7 +397,6 @@ DASHBOARD_HTML = """
                         <h3>View Application Schemas</h3>
                         <button class="btn-action" onclick="fetchInternalData('/api/internal/appointments', 'appointments-json')">Load Appointments Matrix</button>
                         <button class="btn-action" onclick="fetchInternalData('/api/services', 'appointments-json')">Inspect Active Services</button>
-                        <button class="btn-action" onclick="fetchInternalData('/api/tos', 'appointments-json')">View Terms API Node</button>
                         <div id="appointments-json" class="json-output" style="display:none;"></div>
                     </div>
                 </div>
@@ -476,20 +474,6 @@ DASHBOARD_HTML = """
                     <button type="button" onclick="closeSmtpModal()" style="background:#4a3a3d; color:#fff; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">CANCEL</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <div class="modal-bg" id="tosModal" style="display:none;">
-        <div class="modal-box" style="width: 500px; border-color: #e1b12c;">
-            <h4 style="color:#e1b12c; margin:0 0 15px; text-transform:uppercase;">System Terms of Service</h4>
-            <div style="background:rgba(0,0,0,0.4); border:1px solid var(--border); padding:15px; border-radius:6px; max-height:220px; overflow-y:auto; font-size:13px; color:#ccc; margin-bottom:20px; line-height:1.5;">
-                <p><strong>Effective Deployment:</strong> 2026-06-22 (v3.0)</p>
-                <p>Welcome to the Management Command Center. By acknowledging this prompt, you confirm adherence to institutional access controls, authorized configuration overwrite directives, and security parameters regarding client profile registries and arcade score databases.</p>
-                <p>All pipeline modifications, SMTP transitions, and background worker interactions executed inside this administrator scope are monitored and cached permanently.</p>
-            </div>
-            <div class="modal-flex">
-                <button type="button" onclick="acknowledgeToS()" style="background:#e1b12c; color:#000; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">I ACKNOWLEDGE SYSTEM DIRECTIVES</button>
-            </div>
         </div>
     </div>
 
@@ -726,43 +710,9 @@ DASHBOARD_HTML = """
             } catch (err) {}
         }
 
-        // --- ToS POPUP CONTROL TELEMETRY ---
-        async function checkToSStatus() {
-            try {
-                const r = await fetch('/api/internal/tos-status');
-                const data = await r.json();
-                const localAckVersion = localStorage.getItem('acknowledged_tos_version');
-                
-                if (localAckVersion !== data.tos_version) {
-                    document.getElementById('tosModal').style.display = 'flex';
-                    window.currentServerTosVersion = data.tos_version;
-                }
-            } catch(e) { console.error("Error evaluating internal ToS pipeline:", e); }
-        }
-
-        function acknowledgeToS() {
-            if (window.currentServerTosVersion) {
-                localStorage.setItem('acknowledged_tos_version', window.currentServerTosVersion);
-            }
-            document.getElementById('tosModal').style.display = 'none';
-        }
-
-        async function resetGlobalToS() {
-            if (!confirm("Force all administration sessions to re-acknowledge the Terms of Service next time they initialize?")) return;
-            try {
-                const r = await fetch('/api/internal/tos-reset', { method: 'POST' });
-                const data = await r.json();
-                if (data.status === 'success') {
-                    alert(`Global ToS mutation targeted. Active version token pushed to registry v${data.new_version}.`);
-                    checkToSStatus();
-                }
-            } catch(e) { alert("Exception handling asynchronous version mutation."); }
-        }
-
         // Run baseline setup routines on initialization
         updateAppointmentsLog();
         syncTelemetry();
-        checkToSStatus();
 
         // 2-Second loop execution for automatic updates 
         setInterval(updateAppointmentsLog, 2000);
@@ -838,29 +788,6 @@ def save_maintenance_settings():
     return jsonify({"status": "success"})
 
 
-# --- ToS Global Visibility State Endpoints ---
-@app.route("/api/internal/tos-status", methods=["GET"])
-@require_admin_session
-def get_tos_status():
-    tos_version = get_config_val("tos_global_version", "1")
-    return jsonify({"tos_version": tos_version})
-
-
-@app.route("/api/internal/tos-reset", methods=["POST"])
-@require_admin_session
-def reset_tos_status():
-    try:
-        current_version = int(get_config_val("tos_global_version", "1"))
-    except (ValueError, TypeError):
-        current_version = 1
-    new_version = str(current_version + 1)
-    
-    with get_db() as conn:
-        conn.execute("INSERT OR REPLACE INTO config_settings (key, value) VALUES ('tos_global_version', ?)", (new_version,))
-        conn.commit()
-    return jsonify({"status": "success", "new_version": new_version})
-
-
 # --- Invoice Automation Thread Dispatchers ---
 @app.route("/api/internal/appointments/<int:appt_id>/invoice", methods=["POST"])
 @require_admin_session
@@ -886,9 +813,16 @@ def get_internal_appointments():
     return jsonify([dict(r) for r in rows])
 
 
+# Public endpoint used directly by your Squarespace Code Injection popup
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
-    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
+    tos_version = get_config_val("tos_global_version", "1")
+    return jsonify({
+        "version": tos_version, 
+        "title": "Terms & Conditions", 
+        "effectiveDate": "2026-06-22", 
+        "updated": True
+    })
 
 
 @app.route("/api/services", methods=["GET"])
@@ -1024,7 +958,6 @@ def create_appointment():
     fallback_svc = SERVICES.get(data.get("message_type", ""), {})
     fallback_price = fallback_svc.get("price", 0)
 
-    # Accept the active frontend calculated price directly to preserve live Squarespace sale rates
     price = data.get("price", fallback_price)
     try:
         price = float(price)
