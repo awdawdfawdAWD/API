@@ -813,7 +813,7 @@ def get_internal_appointments():
 
 @app.route("/api/tos", methods=["GET"])
 def get_tos():
-    return jsonify({"version": "3.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
+    return jsonify({"version": "2.0", "title": "Terms of Service", "effectiveDate": "2026-06-22", "updated": True})
 
 
 @app.route("/api/services", methods=["GET"])
