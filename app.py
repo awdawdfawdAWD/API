@@ -293,65 +293,395 @@ DASHBOARD_HTML = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Management Command Center</title>
     <style>
-        :root { --neon: #ff6b8b; --neon-cyan: #00f0ff; --bg: #070506; --sidebar: #0f0a0c; --panel: #161012; --border: rgba(255, 107, 139, 0.12); }
-        body { background: var(--bg); color: #f5eff1; font-family: system-ui, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 25px; box-sizing: border-box; }
-        .brand-block { display: flex; align-items: center; gap: 12px; font-weight: 700; color: #fff; font-size: 15px; }
-        
-        .radar-dot { width: 10px; height: 10px; border-radius: 50%; transition: background 0.3s, box-shadow 0.3s; }
-        .radar-dot.online { background: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
-        .radar-dot.offline { background: #ff4a4a; box-shadow: 0 0 10px #ff4a4a; }
+        :root { 
+            --neon-pink: #ff6b8b; 
+            --neon-pink-glow: rgba(255, 107, 139, 0.3);
+            --neon-cyan: #00f0ff; 
+            --neon-cyan-glow: rgba(0, 240, 255, 0.25);
+            --neon-green: #00ffcc;
+            --neon-red: #ff4a4a;
+            --bg-main: #0a0608; 
+            --bg-sidebar: #12090c; 
+            --bg-panel: rgba(26, 18, 21, 0.75); 
+            --bg-card: #23171b;
+            --border-glow: rgba(255, 107, 139, 0.15); 
+            --text-primary: #f5eff1;
+            --text-secondary: #a69297;
+        }
 
-        .menu-list { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; flex: 1; }
-        .nav-btn { display: flex; align-items: center; gap: 12px; background: transparent; border: 1px solid transparent; color: #9c8b90; width: 100%; padding: 12px 16px; border-radius: 8px; text-align: left; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .nav-btn.active { background: rgba(255, 107, 139, 0.08); border-color: rgba(255, 107, 139, 0.2); color: var(--neon); }
-        .logout-btn { border: 1px solid rgba(255,74,74,0.3); color: #ff4a4a; text-decoration: none; text-align: center; padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; }
-        .main-frame { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .top-stat-bar { background: var(--sidebar); border-bottom: 1px solid var(--border); padding: 15px 35px; display: flex; gap: 40px; align-items: center; }
-        .mini-metric { font-size: 12px; color: #8f8084; text-transform: uppercase; font-weight: 600; }
-        .mini-metric span { display: block; font-size: 15px; color: #fff; font-weight: 700; margin-top: 2px; }
-        .content-container { flex: 1; padding: 35px; overflow-y: auto; box-sizing: border-box; }
-        .view-pane { display: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            background: var(--bg-main); 
+            color: var(--text-primary); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        /* --- Sidebar Navigation --- */
+        .sidebar { 
+            width: 300px; 
+            background: var(--bg-sidebar); 
+            border-right: 1px solid var(--border-glow); 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            padding: 30px 20px; 
+            box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .brand-block { 
+            display: flex; 
+            align-items: center; 
+            gap: 14px; 
+            font-weight: 800; 
+            color: #fff; 
+            font-size: 14px; 
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding-bottom: 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .radar-dot { 
+            width: 12px; 
+            height: 12px; 
+            border-radius: 50%; 
+            position: relative;
+        }
+        .radar-dot::after {
+            content: '';
+            position: absolute;
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            opacity: 0.5;
+        }
+        .radar-dot.online { background: var(--neon-green); box-shadow: 0 0 12px var(--neon-green); }
+        .radar-dot.online::after { background: var(--neon-green); }
+        .radar-dot.offline { background: var(--neon-red); box-shadow: 0 0 12px var(--neon-red); }
+        .radar-dot.offline::after { background: var(--neon-red); }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+
+        .menu-list { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            margin-top: 35px; 
+            flex: 1; 
+        }
+        
+        .nav-btn { 
+            display: flex; 
+            align-items: center; 
+            gap: 14px; 
+            background: transparent; 
+            border: 1px solid transparent; 
+            color: var(--text-secondary); 
+            width: 100%; 
+            padding: 14px 18px; 
+            border-radius: 10px; 
+            text-align: left; 
+            font-size: 14px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.03);
+            color: #fff;
+        }
+        .nav-btn.active { 
+            background: rgba(255, 107, 139, 0.08); 
+            border: 1px solid rgba(255, 107, 139, 0.25); 
+            color: var(--neon-pink); 
+            box-shadow: inset 0 0 12px rgba(255, 107, 139, 0.05);
+        }
+
+        .logout-btn { 
+            border: 1px solid rgba(255, 74, 74, 0.25); 
+            color: var(--neon-red); 
+            text-decoration: none; 
+            text-align: center; 
+            padding: 14px; 
+            border-radius: 10px; 
+            font-size: 13px; 
+            font-weight: 700; 
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            background: rgba(255, 74, 74, 0.02);
+        }
+        .logout-btn:hover {
+            background: var(--neon-red);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(255, 74, 74, 0.4);
+        }
+
+        /* --- Main Workframe Engine --- */
+        .main-frame { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+
+        /* Top Status Bar Telemetry */
+        .top-stat-bar { 
+            background: var(--bg-sidebar); 
+            border-bottom: 1px solid var(--border-glow); 
+            padding: 20px 40px; 
+            display: flex; 
+            gap: 50px; 
+            align-items: center; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        
+        .mini-metric { 
+            font-size: 11px; 
+            color: var(--text-secondary); 
+            text-transform: uppercase; 
+            font-weight: 700; 
+            letter-spacing: 1px;
+        }
+        .mini-metric span { 
+            display: block; 
+            font-size: 16px; 
+            color: #fff; 
+            font-weight: 700; 
+            margin-top: 4px; 
+            font-family: monospace;
+        }
+
+        /* Content Container Layout */
+        .content-container { 
+            flex: 1; 
+            padding: 40px; 
+            overflow-y: auto; 
+            background: linear-gradient(180deg, var(--bg-main) 0%, #050203 100%);
+        }
+        
+        .view-pane { display: none; animation: fadeIn 0.4s ease-out forwards; }
         .view-pane.active { display: block; }
-        .grid-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
-        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 25px rgba(0,0,0,0.3); margin-bottom: 20px; }
-        .panel h3 { margin: 0 0 20px; color: var(--neon); font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-        .record-card { background: #1d1618; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid var(--neon); display: flex; justify-content: space-between; align-items: center; }
-        .record-card .name { font-weight: 600; color: #fff; font-size: 15px; }
-        .record-card .details { font-size: 13px; color: #9c8b90; margin-top: 3px; }
-        .status-pill { background: rgba(255, 107, 139, 0.1); color: var(--neon); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-        .status-pill.done { background: rgba(0, 255, 204, 0.1); color: #00ffcc; }
-        .status-pill.cancelled { background: rgba(255, 74, 74, 0.1); color: #ff4a4a; }
-        
-        .btn-action { background: transparent; border: 1px solid var(--neon); color: var(--neon); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; text-align: center; display: block; text-decoration: none; box-sizing: border-box; }
-        .btn-action:hover { background: var(--neon); color: #fff; }
-        .btn-invoice { background: rgba(0, 240, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; margin-top: 6px; display: inline-block; }
-        
-        .ctrl-group { display: flex; gap: 4px; margin-top: 8px; }
-        .ctrl-btn { padding: 4px 8px; font-size: 11px; font-weight: bold; border: 1px solid #444; background: #222; color: #ccc; cursor: pointer; border-radius: 4px; }
-        .ctrl-btn:hover { background: #333; color: #fff; }
-        .ctrl-btn.danger:hover { background: #ff4a4a; color: #fff; border-color: #ff4a4a; }
 
-        .json-output { background: #0d090a; color: #00ffcc; font-family: monospace; padding: 15px; border-radius: 6px; font-size: 12px; overflow-x: auto; max-height: 300px; white-space: pre-wrap; margin-top: 15px; border: 1px solid rgba(0,255,204,0.1); }
-        .switch-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .grid-layout { 
+            display: grid; 
+            grid-template-columns: 1.6fr 1fr; 
+            gap: 35px; 
+            align-items: start;
+        }
+
+        /* Panel Glassmorphism Aesthetics */
+        .panel { 
+            background: var(--bg-panel); 
+            border: 1px solid var(--border-glow); 
+            border-radius: 16px; 
+            padding: 30px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        
+        .panel h3 { 
+            margin-bottom: 25px; 
+            color: var(--text-primary); 
+            font-size: 14px; 
+            font-weight: 800;
+            text-transform: uppercase; 
+            letter-spacing: 1.5px; 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+            padding-bottom: 15px; 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- Dynamic Record Elements & Component Cards --- */
+        .record-card { 
+            background: var(--bg-card); 
+            border-radius: 12px; 
+            padding: 20px; 
+            margin-bottom: 16px; 
+            border-left: 4px solid var(--neon-pink); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .record-card:hover {
+            transform: translateX(4px);
+        }
+        .record-card .name { font-weight: 700; color: #fff; font-size: 16px; }
+        .record-card .details { font-size: 13px; color: var(--text-secondary); margin-top: 5px; }
+        
+        .status-pill { 
+            background: rgba(255, 107, 139, 0.12); 
+            color: var(--neon-pink); 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 11px; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px;
+            display: inline-block;
+            border: 1px solid rgba(255, 107, 139, 0.2);
+        }
+        .status-pill.done { background: rgba(0, 255, 204, 0.1); color: var(--neon-green); border-color: rgba(0, 255, 204, 0.2); }
+        .status-pill.cancelled { background: rgba(255, 74, 74, 0.1); color: var(--neon-red); border-color: rgba(255, 74, 74, 0.2); }
+        
+        /* Interactive Control Actions */
+        .btn-action { 
+            background: transparent; 
+            border: 1px solid var(--neon-pink); 
+            color: var(--neon-pink); 
+            padding: 14px 20px; 
+            border-radius: 10px; 
+            font-size: 13px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: all 0.3s; 
+            width: 100%; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            display: block; 
+            text-decoration: none; 
+            box-sizing: border-box; 
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .btn-action:hover { 
+            background: var(--neon-pink); 
+            color: #000; 
+            box-shadow: 0 0 20px var(--neon-pink-glow);
+            font-weight: 800;
+        }
+        
+        .btn-invoice { 
+            background: rgba(0, 240, 255, 0.05); 
+            border: 1px solid var(--neon-cyan); 
+            color: var(--neon-cyan); 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            font-size: 11px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            display: inline-block; 
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn-invoice:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 12px var(--neon-cyan-glow);
+        }
+        
+        .ctrl-group { display: flex; gap: 6px; margin-top: 12px; }
+        .ctrl-btn { 
+            padding: 6px 10px; 
+            font-size: 11px; 
+            font-weight: 700; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            background: rgba(0,0,0,0.2); 
+            color: #ccc; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            transition: all 0.2s;
+        }
+        .ctrl-btn:hover { background: #fff; color: #000; border-color: #fff; }
+        .ctrl-btn.danger:hover { background: var(--neon-red); color: #fff; border-color: var(--neon-red); box-shadow: 0 0 10px rgba(255,74,74,0.3); }
+
+        /* Configuration Toggles */
+        .switch-wrap { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            margin-bottom: 25px; 
+            background: rgba(0,0,0,0.2); 
+            padding: 16px 20px; 
+            border-radius: 12px; 
+            border: 1px solid rgba(255,255,255,0.05); 
+        }
+        .switch { position: relative; display: inline-block; width: 48px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #332225; transition: .3s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: #8f8084; transition: .3s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--neon); }
-        input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #2c1e21; transition: .3s; border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: var(--text-secondary); transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: rgba(255, 107, 139, 0.2); border-color: var(--neon-pink); }
+        input:checked + .slider:before { transform: translateX(22px); background-color: var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink); }
 
-        .modal-bg { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:10000; }
-        .modal-box { background:var(--panel); border:1px solid var(--neon); padding:30px; border-radius:12px; width:400px; }
-        .modal-box label { display:block; font-size:12px; color:#8f8084; margin-bottom:6px; text-transform:uppercase; }
-        .modal-box input, .modal-box textarea { width:100%; padding:10px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:6px; color:#fff; box-sizing:border-box; margin-bottom:15px; outline:none; }
-        .modal-flex { display:flex; gap:10px; }
+        /* Infrastructure Schemas Terminals */
+        .json-output { 
+            background: #080406; 
+            color: var(--neon-cyan); 
+            font-family: 'Courier New', Courier, monospace; 
+            padding: 18px; 
+            border-radius: 10px; 
+            font-size: 12px; 
+            overflow-x: auto; 
+            max-height: 320px; 
+            white-space: pre-wrap; 
+            margin-top: 18px; 
+            border: 1px solid rgba(0, 240, 255, 0.15); 
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.6);
+        }
         
+        /* Tables Configuration */
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-        .leaderboard-table th, .leaderboard-table td { text-align: left; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .leaderboard-table th { color: var(--neon); text-transform: uppercase; font-size: 12px; }
+        .leaderboard-table th, .leaderboard-table td { text-align: left; padding: 14px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .leaderboard-table th { color: var(--neon-pink); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; font-weight: 700; }
+        .leaderboard-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+        /* --- Global Operational Modals --- */
+        .modal-bg { 
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: rgba(5, 2, 3, 0.8); 
+            backdrop-filter: blur(8px); 
+            -webkit-backdrop-filter: blur(8px);
+            display: none; justify-content:center; align-items:center; z-index:10000; 
+        }
+        .modal-box { 
+            background: #181013; 
+            border: 1px solid rgba(255, 107, 139, 0.3); 
+            padding: 35px; 
+            border-radius: 16px; 
+            width: 440px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+            animation: modalScale 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes modalScale {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-box label { display:block; font-size:11px; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing: 1px; font-weight: 700; }
+        .modal-box input, .modal-box textarea { 
+            width:100%; padding:12px; 
+            background: rgba(0,0,0,0.3); 
+            border: 1px solid rgba(255,255,255,0.08); 
+            border-radius: 8px; 
+            color: #fff; box-sizing:border-box; margin-bottom:20px; outline:none; 
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .modal-box input:focus, .modal-box textarea:focus {
+            border-color: var(--neon-pink);
+        }
+        .modal-flex { display:flex; gap:12px; }
     </style>
 </head>
 <body>
@@ -360,7 +690,7 @@ DASHBOARD_HTML = """
         <div>
             <div class="brand-block">
                 <div id="platform-status-dot" class="radar-dot {% if maintenance == 'true' %}offline{% else %}online{% endif %}"></div>
-                MANAGEMENT PLATFORM
+                CORE CONTROL CORE
             </div>
             <div class="menu-list">
                 <button class="nav-btn active" onclick="navigatePanel(this, 'appointments')">📋 Appointments Stream</button>
@@ -368,7 +698,7 @@ DASHBOARD_HTML = """
                 <button class="nav-btn" onclick="navigatePanel(this, 'records')">🗂️ Secondary Sub-Tables</button>
             </div>
         </div>
-        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 12px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
+        <button class="btn-action" style="border-color:var(--neon-cyan); color:var(--neon-cyan); margin-bottom: 16px;" onclick="openSmtpModal()">⚙️ SMTP RELAY</button>
         <a href="/api/logout" class="logout-btn">TERMINATE ADMIN SESSION</a>
     </div>
 
@@ -386,13 +716,13 @@ DASHBOARD_HTML = """
                     <div class="panel">
                         <h3>Appointments Storage Logs</h3>
                         <div id="appointments-list-target">
-                            <p style="color:#8f8084; font-style:italic; font-size:14px;">Connecting to structural logs...</p>
+                            <p style="color:var(--text-secondary); font-style:italic; font-size:14px;">Connecting to structural logs...</p>
                         </div>
                     </div>
                     <div class="panel">
                         <h3>System Directives</h3>
                         <div class="switch-wrap">
-                            <span style="font-size:13px; font-weight:600; color:#fff;">🛠️ MAINTENANCE MODE</span>
+                            <span style="font-size:13px; font-weight:700; color:#fff; letter-spacing:0.5px;">🛠️ MAINTENANCE MODE</span>
                             <label class="switch">
                                 <input type="checkbox" id="maintToggle" onchange="toggleMaintenance(this)" {% if maintenance == 'true' %}checked{% endif %}>
                                 <span class="slider"></span>
@@ -421,7 +751,7 @@ DASHBOARD_HTML = """
                     <div class="panel">
                         <h3>Client Profile Matrix</h3>
                         <div id="client-list-target">
-                            <p style="color:#8f8084; font-size:13px; font-style:italic;">Loading Client Profiler stream logs...</p>
+                            <p style="color:var(--text-secondary); font-size:13px; font-style:italic;">Loading Client Profiler stream logs...</p>
                         </div>
                         
                         <br>
@@ -432,14 +762,14 @@ DASHBOARD_HTML = """
                                     <tr><th>Player</th><th>Score</th><th>Level</th><th>Game Mode</th></tr>
                                 </thead>
                                 <tbody id="leaderboard-body-rows">
-                                    <tr><td colspan="4" style="color:#8f8084; font-style:italic;">Querying game matrix storage clusters...</td></tr>
+                                    <tr><td colspan="4" style="color:var(--text-secondary); font-style:italic;">Querying game matrix storage clusters...</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                     <div class="panel">
                         <h3>Staff Profile Engine</h3>
-                        <button class="btn-action" style="background:var(--neon); color:#000;" onclick="openClientModal()">➕ ADD NEW CLIENT PROFILE</button>
+                        <button class="btn-action" style="background:var(--neon-pink); color:#000; font-weight:800;" onclick="openClientModal()">➕ ADD NEW CLIENT PROFILE</button>
                         <button class="btn-action" onclick="loadClientList()">🔄 Refresh Profile Matrix</button>
                         <button class="btn-action" onclick="loadLeaderboardMatrix()">🔄 Refresh Game Leaderboard</button>
                         <button class="btn-action" onclick="fetchInternalData('/api/game-scores', 'records-json')">Inspect Raw Score Cluster</button>
@@ -452,7 +782,7 @@ DASHBOARD_HTML = """
 
     <div class="modal-bg" id="clientModal">
         <div class="modal-box">
-            <h4 style="color:var(--neon); margin:0 0 20px; text-transform:uppercase;">Register Client Profile</h4>
+            <h4 style="color:var(--neon-pink); margin:0 0 25px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">Register Client Profile</h4>
             <form id="clientForm" onsubmit="submitClientForm(event)">
                 <label>Full Name *</label><input type="text" id="m_name" required>
                 <label>Date of Birth</label><input type="text" id="m_dob" placeholder="YYYY-MM-DD">
@@ -460,8 +790,8 @@ DASHBOARD_HTML = """
                 <label>Address</label><input type="text" id="m_address">
                 <label>Clinical Massage Notes</label><textarea id="m_notes" rows="3"></textarea>
                 <div class="modal-flex">
-                    <button type="submit" style="background:var(--neon); color:#fff; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">SAVE ENTRY</button>
-                    <button type="button" onclick="closeClientModal()" style="background:#4a3a3d; color:#fff; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">CANCEL</button>
+                    <button type="submit" style="background:var(--neon-pink); color:#000; padding:14px; border:none; border-radius:8px; font-weight:800; cursor:pointer; flex:1; text-transform:uppercase; letter-spacing:0.5px;">SAVE ENTRY</button>
+                    <button type="button" onclick="closeClientModal()" style="background:#2c1e21; color:#fff; padding:14px; border:none; border-radius:8px; font-weight:700; cursor:pointer; flex:1; text-transform:uppercase; letter-spacing:0.5px;">CANCEL</button>
                 </div>
             </form>
         </div>
@@ -469,15 +799,15 @@ DASHBOARD_HTML = """
 
     <div class="modal-bg" id="smtpModal">
         <div class="modal-box">
-            <h4 style="color:var(--neon-cyan); margin:0 0 20px; text-transform:uppercase;">SMTP Relaying Configurations</h4>
+            <h4 style="color:var(--neon-cyan); margin:0 0 25px; text-transform:uppercase; letter-spacing:1px; font-weight:800;">SMTP Relaying Configurations</h4>
             <form id="smtpForm" onsubmit="submitSmtpForm(event)">
                 <label>SMTP Relay Host</label><input type="text" id="s_host" required>
                 <label>Port</label><input type="text" id="s_port" required>
                 <label>Sender Email Address</label><input type="email" id="s_user" required>
                 <label>Relay Password / App Key</label><input type="password" id="s_pass" placeholder="••••••••••••">
                 <div class="modal-flex">
-                    <button type="submit" style="background:var(--neon-cyan); color:#000; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">UPDATE CONFIGS</button>
-                    <button type="button" onclick="closeSmtpModal()" style="background:#4a3a3d; color:#fff; padding:12px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; flex:1;">CANCEL</button>
+                    <button type="submit" style="background:var(--neon-cyan); color:#000; padding:14px; border:none; border-radius:8px; font-weight:800; cursor:pointer; flex:1; text-transform:uppercase; letter-spacing:0.5px;">UPDATE CONFIGS</button>
+                    <button type="button" onclick="closeSmtpModal()" style="background:#2c1e21; color:#fff; padding:14px; border:none; border-radius:8px; font-weight:700; cursor:pointer; flex:1; text-transform:uppercase; letter-spacing:0.5px;">CANCEL</button>
                 </div>
             </form>
         </div>
@@ -618,16 +948,16 @@ DASHBOARD_HTML = """
                 const r = await fetch('/api/records');
                 const data = await r.json();
                 if(data.length === 0) {
-                    container.innerHTML = `<p style="color:#8f8084; font-size:13px; font-style:italic;">No client accounts indexed.</p>`;
+                    container.innerHTML = `<p style="color:var(--text-secondary); font-size:13px; font-style:italic;">No client accounts indexed.</p>`;
                     return;
                 }
                 let html = '';
                 data.forEach(c => {
-                    html += `<div class="record-card" style="border-left-color:#00f0ff;">
+                    html += `<div class="record-card" style="border-left-color:var(--neon-cyan);">
                         <div>
                             <div class="name">${c.name}</div>
                             <div class="details">DOB: ${c.dob || 'None'} | Phone: ${c.phone || 'None'}</div>
-                            ${c.notes ? `<div class="details" style="color:#ff6b8b; font-style:italic;">* ${c.notes}</div>` : ''}
+                            ${c.notes ? `<div class="details" style="color:var(--neon-pink); font-style:italic;">* ${c.notes}</div>` : ''}
                         </div>
                     </div>`;
                 });
@@ -641,20 +971,20 @@ DASHBOARD_HTML = """
                 const r = await fetch('/api/leaderboard?limit=10');
                 const data = await r.json();
                 if(data.length === 0) {
-                    target.innerHTML = `<tr><td colspan="4" style="color:#8f8084; text-align:center;">No high scores mapped yet.</td></tr>`;
+                    target.innerHTML = `<tr><td colspan="4" style="color:var(--text-secondary); text-align:center;">No high scores mapped yet.</td></tr>`;
                     return;
                 }
                 let html = '';
                 data.forEach(row => {
                     html += `<tr>
                         <td><strong>${row.player_name}</strong></td>
-                        <td style="color:#00ffcc; font-weight:bold;">${row.score}</td>
+                        <td style="color:var(--neon-green); font-weight:bold;">${row.score}</td>
                         <td>${row.level || 'N/A'}</td>
                         <td><span class="status-pill done" style="font-size:9px;">${row.game_mode || 'Default'}</span></td>
                     </tr>`;
                 });
                 target.innerHTML = html;
-            } catch(e) { target.innerHTML = `<tr><td colspan="4" style="color:#ff4a4a;">Telemetry failure mapping arcade cluster scores.</td></tr>`; }
+            } catch(e) { target.innerHTML = `<tr><td colspan="4" style="color:var(--neon-red);">Telemetry failure mapping arcade cluster scores.</td></tr>`; }
         }
 
         async function updateAppointmentsLog() {
@@ -664,7 +994,7 @@ DASHBOARD_HTML = """
                 const r = await fetch('/api/internal/appointments');
                 const data = await r.json();
                 if (data.length === 0) {
-                    container.innerHTML = `<p style="color:#8f8084; font-style:italic; font-size:14px;">No active entries mapped to structural logs.</p>`;
+                    container.innerHTML = `<p style="color:var(--text-secondary); font-style:italic; font-size:14px;">No active entries mapped to structural logs.</p>`;
                     return;
                 }
                 let html = '';
@@ -685,7 +1015,7 @@ DASHBOARD_HTML = """
                             <button class="btn-invoice" onclick="sendInvoice('${appt.id}')">⚡ DISPATCH EMAIL INVOICE</button>
                         </div>
                         <div style="text-align: right;">
-                            <div style="font-weight: 600; font-size:14px; margin-bottom:4px;">${appt.date} @ ${appt.time}</div>
+                            <div style="font-weight: 700; font-size:14px; margin-bottom:6px; font-family:monospace;">${appt.date} <span style="color:var(--text-secondary); font-weight:normal;">@</span> ${appt.time}</div>
                             <span class="status-pill ${appt.status}" id="status-pill-${appt.id}">${appt.status}</span>
                         </div>
                     </div>`;
