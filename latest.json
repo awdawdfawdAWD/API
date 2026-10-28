@@ -1,7 +1,7 @@
 {
-  "versionCode": 1793166127,
+  "versionCode": 1793167079,
   "versionName": "1.0",
-  "apkUrl": "https://www.belsmagichandsmassage.com/s/BelsMagicHands-1793166127.apk",
-  "sha256": "307a0b0e8b04465dc105e324c5dfa0958b25b1344e5506534443ce2ac3d6999f",
+  "apkUrl": "http://127.0.0.1:8000/BelsMagicHands-1793167079.apk",
+  "sha256": "99fccad428bc5f3b9b856af4cd5b226f275ad2c4429ff6cabc591a9b05fad3c9",
   "notes": "Bug fixes, a smoother checkout, and a refreshed look."
 }
