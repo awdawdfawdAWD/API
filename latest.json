@@ -1,8 +1,7 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "title": "New Update Available",
-  "message": "Bug fixes and new features!",
-  "apkUrl": "https://github.com/YOURNAME/YOURREPO/releases/download/v1.0.1/app-release.apk",
-  "forceUpdate": false 
+  "versionCode": 1793165116,
+  "versionName": "1.0",
+  "apkUrl": "https://www.belsmagichandsmassage.com/s/BelsMagicHands-1793165116.apk",
+  "sha256": "010c5d4ddb4d231edf8f7aa00c50d63fb91689b646ee1d85cab444f76396685d",
+  "notes": "Bug fixes, a smoother checkout, and a refreshed look."
 }
