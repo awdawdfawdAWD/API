@@ -1,7 +1,7 @@
 {
-  "versionCode": 1793167079,
+  "versionCode": 1793167293,
   "versionName": "1.0",
-  "apkUrl": "http://127.0.0.1:8000/BelsMagicHands-1793167079.apk",
-  "sha256": "99fccad428bc5f3b9b856af4cd5b226f275ad2c4429ff6cabc591a9b05fad3c9",
+  "apkUrl": "http://127.0.0.1:8000/BelsMagicHands-1793167293.apk",
+  "sha256": "5842965ef5231cf142f863da9c934fef2a098f92624c5760a686ea35646e9027",
   "notes": "Bug fixes, a smoother checkout, and a refreshed look."
 }
